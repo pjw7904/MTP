@@ -1,7 +1,7 @@
-/* 
+/*
  *	Main.c
- *	PETER TEST
- *  
+ *	PETER TESTING
+ *
  *  Created on: Sep 21, 2015
  *  Author: Pranav Sai(pk6420@rit.edu)
  */
@@ -44,7 +44,7 @@ bool isRoot = false;
 struct interface_tracker_t *interfaceTracker = NULL;
 
 /* Entry point to the program */
-int main (int argc, char** argv) {	
+int main (int argc, char** argv) {
 	char **interfaceNames;
 
 	// Check number of Arguments.
@@ -71,8 +71,8 @@ int main (int argc, char** argv) {
 
 		// Fill
 		strncpy(new_node->eth_name, interfaceNames[i], strlen(interfaceNames[i]));
-		new_node->next = NULL; 
-		add_entry_lbcast_LL(new_node); 
+		new_node->next = NULL;
+		add_entry_lbcast_LL(new_node);
 	}
 
 
@@ -89,7 +89,7 @@ int main (int argc, char** argv) {
 			strncpy(new_node->vid_addr, argv[2], strlen(argv[2]));
 			strcpy(new_node->eth_name, "self");   	// own interface, so mark it as self, will be helpful while tracking own VIDs.
 			new_node->last_updated = -1; 		        // -1 here because root ID should not be removed.
-			new_node->port_status = PVID_PORT; 
+			new_node->port_status = PVID_PORT;
 			new_node->next = NULL;
 			new_node->isNew = true;
 			new_node->path_cost = PATH_COST;
@@ -108,7 +108,7 @@ int main (int argc, char** argv) {
 					ctrlSend(interfaceNames[i], payload, payloadLen);
 				}
 				free(payload);
-			}	
+			}
 		} else {
 			printf ("Error: Provide ROOT Switch ID ./main <non MTS/root MTS> <ROOT MTS ID>\n");
 			exit(1);
@@ -167,7 +167,7 @@ void mtp_start() {
 			payload = (uint8_t*) calloc (1, MAX_BUFFER_SIZE);
 
 			// send JOIN MSG if there are no VID entries in the Main VID Table.
-			if (isMain_VID_Table_Empty()) { 
+			if (isMain_VID_Table_Empty()) {
 				payloadLen = build_JOIN_MSG_PAYLOAD(payload);
 			} else {
 				// send if entries already present in Main VID Table.
@@ -176,7 +176,7 @@ void mtp_start() {
 
 			if (payloadLen) {
 				int i = 0;
-				for (; i < numberOfInterfaces; ++i) {			
+				for (; i < numberOfInterfaces; ++i) {
 					ctrlSend(interfaceNames[i], payload, payloadLen);
 				}
 			}
@@ -195,17 +195,17 @@ void mtp_start() {
 				for (; i < numberOfInterfaces; i++) {
 					payload = (uint8_t*) calloc (1, MAX_BUFFER_SIZE);
 
-					payloadLen = build_VID_CHANGE_PAYLOAD(payload, interfaceNames[i], deletedVIDs, numberOfDeletions); 
+					payloadLen = build_VID_CHANGE_PAYLOAD(payload, interfaceNames[i], deletedVIDs, numberOfDeletions);
 					if (payloadLen) {
 						ctrlSend(interfaceNames[i], payload, payloadLen);
-					}  
+					}
 					free(payload);
-				} 
+				}
 
 				// Also check CPVID Table.
 				i = 0;
 				for (; i < numberOfDeletions; i++) {
-					delete_entry_cpvid_LL(deletedVIDs[i]);  
+					delete_entry_cpvid_LL(deletedVIDs[i]);
 				}
 
 
@@ -217,7 +217,7 @@ void mtp_start() {
 						ctrlSend(c1->eth_name, payload, payloadLen);
 					}
 					free(payload);
-				} 
+				}
 
 			}
 
@@ -230,7 +230,7 @@ void mtp_start() {
 			}
 			// reset time.
 			time(&time_advt_beg);
-		} 
+		}
 
 		socklen_t addr_len = sizeof(src_addr);
 
@@ -251,7 +251,7 @@ void mtp_start() {
 				continue;
 			} else {
 				// This is a MTP frame so, incase this port is in Local host broadcast table remove it.
-				delete_entry_lbcast_LL(recvOnEtherPort); 
+				delete_entry_lbcast_LL(recvOnEtherPort);
 			}
 
 			switch ( recvBuffer[14] ) {
@@ -278,7 +278,7 @@ void mtp_start() {
 						// printf ("MTP_TYPE_PERODIC_MSG\n");
 						// Record MAC ADDRESS, if not already present.
 						struct ether_addr src_mac;
-						bool retMainVID, retCPVID; 
+						bool retMainVID, retCPVID;
 
 						memcpy(&src_mac, (struct ether_addr *)&eheader->ether_shost, sizeof(struct ether_addr));
 						retMainVID = update_hello_time_LL(&src_mac);
@@ -308,10 +308,10 @@ void mtp_start() {
 						// Message ordering <MSG_TYPE> <OPERATION> <NUMBER_VIDS>  <PATH COST> <VID_ADDR_LEN> <MAIN_TABLE_VID + EGRESS PORT>
 						uint8_t operation = (uint8_t) recvBuffer[15];
 
-						if (operation == VID_ADD) { 
+						if (operation == VID_ADD) {
 							uint8_t numberVIDS = (uint8_t) recvBuffer[16];
 							//printf ("numberVIDS %u\n", numberVIDS);
-							int tracker = 17;		
+							int tracker = 17;
 							bool hasAdditions = false;
 							while (numberVIDS != 0) {
 								uint8_t path_cost = (uint8_t)recvBuffer[tracker];
@@ -323,7 +323,7 @@ void mtp_start() {
 								// <VID_ADDR_LEN>
 								uint8_t vid_len = recvBuffer[tracker];
 
-								// next byte 
+								// next byte
 								tracker = tracker + 1;
 
 								char vid_addr[vid_len];
@@ -335,7 +335,7 @@ void mtp_start() {
 
 								int ret = isChild(vid_addr);
 
-								// if VID child ignore, incase part of PVID add to Child PVID table. 
+								// if VID child ignore, incase part of PVID add to Child PVID table.
 								if ( ret == 1) {
 									// if this is the first VID in the table and is a child, we have to add into child PVID Table
 									if (numberVIDS == (uint8_t) recvBuffer[16]) { // if same first ID
@@ -353,9 +353,9 @@ void mtp_start() {
 
 										} else { // if already there deallocate node memory
 											free(new_cpvid);
-										}	
+										}
 									}
-								} else if ( ret == -1) { 
+								} else if ( ret == -1) {
 									// Add to Main VID Table, if not a child, make it PVID if there is no better path already in the table.
 
 									// Allocate memory and intialize(calloc).
@@ -364,7 +364,7 @@ void mtp_start() {
 									// Fill data.
 									strncpy(new_node->vid_addr, vid_addr, strlen(vid_addr));
 									strncpy(new_node->eth_name, recvOnEtherPort, strlen(recvOnEtherPort));
-									new_node->last_updated = time(0); // current timestamp 
+									new_node->last_updated = time(0); // current timestamp
 									new_node->port_status = PVID_PORT;
 									new_node->next = NULL;
 									new_node->isNew = true;
@@ -381,15 +381,15 @@ void mtp_start() {
 										// If peer has VID derived from me earlier and has a change now.
 										if (numberVIDS == (uint8_t) recvBuffer[16]) { // if same first ID
 											// Check PVID used by peer is a derived PVID from me.
-											delete_MACentry_cpvid_LL(&new_node->mac); 
-										} 
+											delete_MACentry_cpvid_LL(&new_node->mac);
+										}
 									}
 								} else {
 									// Dont do anything, may be a parent vid or duplicate
 								}
 								numberVIDS--;
 							}
-							
+
 							if (hasAdditions) {
 								memset(interfaceNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
 								int numberOfInterfaces = getActiveInterfaces(interfaceNames);
@@ -414,7 +414,7 @@ void mtp_start() {
 							// Message ordering <MSG_TYPE> <OPERATION> <NUMBER_VIDS> <VID_ADDR_LEN> <MAIN_TABLE_VID + EGRESS PORT>
 							uint8_t numberVIDS = (uint8_t) recvBuffer[16];
 
-							// delete all local entries, get a list and send to others who derive from this VID. 
+							// delete all local entries, get a list and send to others who derive from this VID.
 							memset(deletedVIDs, '\0', sizeof(char) * MAX_VID_LIST * MAX_VID_LIST);
 
 							uint8_t numberOfDeletions = numberVIDS;
@@ -434,12 +434,12 @@ void mtp_start() {
 								recvBuffer[vid_len] = '\0';
 								hasDeletions = delete_entry_LL(deletedVIDs[i]);
 								delete_entry_cpvid_LL(deletedVIDs[i]);
-								tracker += vid_len; 
+								tracker += vid_len;
 								i++;
-							} 
+							}
 
 							uint8_t *payload;
-							int payloadLen; 
+							int payloadLen;
 							// Only if we have deletions we will be advertising it to our connected peers.
 							if (hasDeletions) {
 								memset(interfaceNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
@@ -453,7 +453,7 @@ void mtp_start() {
 									if (payloadLen) {
 										ctrlSend(interfaceNames[i], payload, payloadLen);
 									}
-									free(payload);              
+									free(payload);
 								}
 
 								payload = (uint8_t*) calloc (1, MAX_BUFFER_SIZE);
@@ -475,12 +475,12 @@ void mtp_start() {
 						print_entries_LL();
 						print_entries_bkp_LL();
 						print_entries_cpvid_LL();
-						print_entries_lbcast_LL(); 
-					} 
+						print_entries_lbcast_LL();
+					}
 					break;
 				default:
 					printf("Unknown Packet\n");
-					break;	
+					break;
 			}
 		}
 
@@ -530,18 +530,18 @@ void mtp_start() {
 						dataSend(cpt->child_port, recvBuffer, recv_len);
 						printf("Sent to child %s\n", cpt->child_port);
 					}
-				}         
+				}
 
 				// Next Send it port from where current PVID is acquired, if it is not same as the received port.
 				if (!isRoot) {
-					struct vid_addr_tuple* vid_t = getInstance_vid_tbl_LL(); 
+					struct vid_addr_tuple* vid_t = getInstance_vid_tbl_LL();
 					if (strcmp(vid_t->eth_name, recvOnEtherPort) != 0) {
 						dataSend(vid_t->eth_name, recvBuffer, recv_len);
 						printf("Sent to PVID%s\n", vid_t->eth_name);
-					} 
+					}
 				}
 				//print_entries_cpvid_LL();
-			} 
+			}
 
 		}
 		// check if there are any pending VID Adverts
@@ -627,10 +627,10 @@ bool checkInterfaceIsActive(char *str) {
 		family = ifa->ifa_addr->sa_family;
 
 		if (family == AF_INET && (strncmp(ifa->ifa_name, str, strlen(str)) == 0) && (ifa->ifa_flags & IFF_UP) != 0) {
-			freeifaddrs(ifaddr);  
+			freeifaddrs(ifaddr);
 			return true;
 		}
 	}
-	freeifaddrs(ifaddr);  
+	freeifaddrs(ifaddr);
 	return false;
 }

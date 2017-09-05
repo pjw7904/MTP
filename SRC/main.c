@@ -1,9 +1,10 @@
 /*
  *	Main.c
- *	PETER TESTING
+ *
  *
  *  Created on: Sep 21, 2015
  *  Author: Pranav Sai(pk6420@rit.edu)
+ *  Peter Willis - MARKED UP FOR MY UNDERSTANDING
  */
 
 #include <stdio.h>
@@ -29,51 +30,66 @@
 #include "feature_payload.h"
 #include "mtp_send.h"
 
+//MTP Ethertype
 #define ETH_MTP_CTRL    0x8850
+
 #define MAX_VID_LIST    20
+
+//I belive "172" is a string in this case for comparsion later to check if its a given private address by GENI/control eth0 interface
 #define CTRL_IP		"172"
 
-/* Function Prototypes */
+//Function Prototypes
 void mtp_start();
 int getActiveInterfaces(char **);
 void learn_active_interfaces();
 bool checkInterfaceIsActive(char *);
 
-/* Globals */
+//Global variables
 bool isRoot = false;
 struct interface_tracker_t *interfaceTracker = NULL;
 
-/* Entry point to the program */
+//main function, protocol begins here
 int main (int argc, char** argv) {
 	char **interfaceNames;
 
-	// Check number of Arguments.
+	/*Check number of Arguments, after the program name
+	 *A "1" argument means that the switch is the root of a meshed tree, a "0" means that it is a child
+	 *If a "1" is specified first, then another argument has to be added that tells the program what the root VID is
+	 *Ex: ./mtp 1 1 = I am the root switch, and my VID (the root VID) is 1
+	 */
 	if (argc < 2) {
 		printf("Error: Node spec or ROOT MTS ID missing. Format ./main <non MTS/root MTS> <ROOT MTS ID>\n");
 		printf("Error: 0 for non MTS, 1 for root MTS\n");
 		exit(1);
 	}
 
-	// Check if Node is Root MTS or Non MTS
+	//Check if Node is Root MTS or Non MTS, atoi converts a string argument into an integer (why >= 1 and not == 1?)
 	if (atoi(argv[1]) >= 1) {
 		isRoot = true;
 	}
 
-	// Populate local host broadcast table, intially we mark all ports as host ports, if we get a MTP CTRL frame from any port we remove it.
+
+//----------------------------------------------------------BCAST TABLE START--------------------------------------------------------------------------
+	/*
+	 *Intially we mark all ports as host ports, if we get a MTP CTRL frame from any port we remove it. The local host broadcast table is populated as a result of the
+	 *ports all being host ports
+	 */
 	interfaceNames = (char**) calloc (MAX_INTERFACES*MAX_INTERFACES, sizeof(char));
 	memset(interfaceNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
+	//returns the number of interfaces
 	int numberOfInterfaces = getActiveInterfaces(interfaceNames);
 
 	int i = 0;
 	for (; i < numberOfInterfaces; i++) {
-		// Allocate memory and intialize(calloc).
+		// Allocate memory and intialize(calloc), local_bcast_tuple has two vars: ethernet port name, and a pointer to the next local_bcast_tuple
 		struct local_bcast_tuple *new_node = (struct local_bcast_tuple*) calloc (1, sizeof(struct local_bcast_tuple));
 
-		// Fill
+		// eth_name is the one var in local_bcast_tuple, which is the destination in the string copy
 		strncpy(new_node->eth_name, interfaceNames[i], strlen(interfaceNames[i]));
 		new_node->next = NULL;
 		add_entry_lbcast_LL(new_node);
 	}
+//----------------------------------------------------------BCAST TABLE END-----------------------------------------------------------------------------
 
 
 	// If Node is Root MTS
@@ -552,33 +568,47 @@ void mtp_start() {
 int getActiveInterfaces(char **ptr ) {
 	// find all interfaces on the node.
 	int indexLen = 0;
+
+	//structures that describe the network interfaces of the local system
 	struct ifaddrs *ifaddr, *ifa;
 
+	/*The getifaddrs() function creates a linked list of structures describing the network interfaces of the local system,
+	 *and stores the address of the first item of the list in *ifap.  The list consists of ifaddrs structures
+	 */
 	if (getifaddrs(&ifaddr) ) {
 		perror("Error: getifaddrs Failed\n");
 		exit(0);
 	}
 
-	// loop through the list
+	// loop through the list, the last part moves the list to the next struct (interface) as long as there still is one (!NULL)
 	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+
+		//if the interfaces has no address, continue
 		if (ifa->ifa_addr == NULL) {
 			continue;
 		}
+
+		//family reaches into ifa_addr, which is a pointer to a struct sockaddr variable that describes the address family
 		int family;
 		family = ifa->ifa_addr->sa_family;
 
-		// populate interface names, if interface is UP and if ethernet interface doesn't belong to control interface and Loopback interface.
+		// populate interface names, if interface is in the AF_INET family, UP, and if ethernet interface doesn't belong to control interface and Loopback interface.
 		if (family == AF_INET && (strncmp(ifa->ifa_name, "lo", 2) != 0) && (ifa->ifa_flags & IFF_UP) != 0) {
 			char networkIP[NI_MAXHOST];
 
+			//IPv4 AF_INET sockets, grab the IP address from the general ifaddrs struct
 			struct sockaddr_in *ipaddr = ((struct sockaddr_in*) ifa->ifa_addr);
 
+			//Converts a numeric address into a text string suitable for presentation (family, source, destination, size)
 			inet_ntop(AF_INET, &(ipaddr->sin_addr), networkIP, INET_ADDRSTRLEN);
 
+			//compares first three bytes to determine if its control interface from GENI (172.16.0.0/12)
 			if (strncmp(networkIP, CTRL_IP, 3) == 0) {
 				// skip, as it is control interface.
 				continue;
 			}
+
+			//take the argument given to the function, pointer to memory the size of all the interfaces, give it as the dest arg in strncpy.
 			ptr[indexLen] = (char*)calloc(strlen(ifa->ifa_name), sizeof(char));
 			strncpy(ptr[indexLen], ifa->ifa_name, strlen(ifa->ifa_name));
 			indexLen++;

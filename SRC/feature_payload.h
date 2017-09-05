@@ -35,7 +35,7 @@
 #define VID_ADD			            1
 #define VID_DEL			            2
 
-#define PVID_PORT 		          1 
+#define PVID_PORT 		          1
 #define NON_PVID_PORT		        2
 
 #define PATH_COST		            0

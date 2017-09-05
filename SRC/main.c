@@ -250,6 +250,7 @@ void mtp_start() {
 
 		socklen_t addr_len = sizeof(src_addr);
 
+		//recvfrom - receive a message from a socket, recvBuffer is where the PDU is stored
 		recv_len = recvfrom(sockCtrl, recvBuffer, MAX_BUFFER_SIZE, MSG_DONTWAIT, (struct sockaddr*) &src_addr, &addr_len);
 		if (recv_len > 0) {
 			char recvOnEtherPort[5];
@@ -270,9 +271,16 @@ void mtp_start() {
 				delete_entry_lbcast_LL(recvOnEtherPort);
 			}
 
+			//switch statement for 14th index of recvBuffer (frame),
 			switch ( recvBuffer[14] ) {
+
+				/*
+				 *MT_JOIN - this message is sent by a switch that hears  MT_ADVT messages on its ports and desires to join on one of the tree branches the *advertised in the MT_VIDs.
+				*/
 				case MTP_TYPE_JOIN_MSG:
 					{
+						printf ("MTP [JOIN] MESSAGE RECIEVED\n");
+
 						uint8_t *payload = NULL;
 						int payloadLen = 0;
 
@@ -289,9 +297,14 @@ void mtp_start() {
 						// Send VID Advt
 					}
 					break;
+
+				/*
+				 *MT_HELLO – this message is a keep-alive indicator and issued periodically on all MTP_ports by a switch running the MTP. A root switch that sends *this message will carry the MT_VID of the root switch. A non-root switch that sends this message will carry all of its MT_VIDs.
+				*/
 				case MTP_TYPE_PERODIC_MSG:
 					{
-						// printf ("MTP_TYPE_PERODIC_MSG\n");
+						printf ("MTP [HELLO] MESSAGE RECIEVED\n");
+
 						// Record MAC ADDRESS, if not already present.
 						struct ether_addr src_mac;
 						bool retMainVID, retCPVID;
@@ -316,9 +329,14 @@ void mtp_start() {
 						}
 					}
 					break;
+
+					/*
+					 *MT_ADVT – A switch which already has an MT_VID, when it receives an MT_NULL message on a port, will move that port to be an MT_port. It will *then send an MT_ADVT message that contains a unique MT_VID that the new switch can use. This MT_VID will be one of its The MT_ADVT message can *also be sent on receiving an MT_JOIN message defined next.
+					*/
 				case MTP_TYPE_VID_ADVT:
 					{
-						//printf ("MTP_TYPE_VID_ADVT\n");
+						printf ("MTP [JOIN] MESSAGE RECIEVED\n");
+
 						// Got VID Advt, check relationship, if child add to Child PVID Table.
 						// Number of VIDs
 						// Message ordering <MSG_TYPE> <OPERATION> <NUMBER_VIDS>  <PATH COST> <VID_ADDR_LEN> <MAIN_TABLE_VID + EGRESS PORT>
@@ -494,7 +512,10 @@ void mtp_start() {
 						print_entries_lbcast_LL();
 					}
 					break;
+
 				default:
+					printf ("NON-MTP PDU RECIEVED: ");
+
 					printf("Unknown Packet\n");
 					break;
 			}

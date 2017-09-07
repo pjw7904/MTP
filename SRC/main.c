@@ -337,7 +337,7 @@ void mtp_start() {
 					*/
 				case MTP_TYPE_VID_ADVT:
 					{
-						printf ("MTP [JOIN] MESSAGE RECIEVED\n");
+						printf ("MTP [VID ADVT] MESSAGE RECIEVED\n");
 
 						// Got VID Advt, check relationship, if child add to Child PVID Table.
 						// Number of VIDs

@@ -430,8 +430,8 @@ void mtp_start() {
 											delete_MACentry_cpvid_LL(&new_node->mac);
 										}
 									}
+									printf("First VID Time: %f", (double)(difftime(converge1_fin, converge1_beg)));
 								}
-								printf("First VID Time: %f", (double)(difftime(converge1_fin, converge1_beg)));
 								else {
 									// Dont do anything, may be a parent vid or duplicate
 								}

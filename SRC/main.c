@@ -337,7 +337,7 @@ void mtp_start() {
 					*/
 				case MTP_TYPE_VID_ADVT:
 					{
-						printf ("MTP [VID ADVT] MESSAGE RECIEVED :");
+						printf ("[MTP VID INFO RECIEVED: ");
 
 						// Got VID Advt, check relationship, if child add to Child PVID Table.
 						// Number of VIDs
@@ -351,24 +351,23 @@ void mtp_start() {
 							bool hasAdditions = false;
 							while (numberVIDS != 0) {
 								uint8_t path_cost = (uint8_t)recvBuffer[tracker];
-								printf("Path Cost: %u |", recvBuffer[tracker]);
+								printf("Path Cost: %u | ", path_cost);
 
 								// next byte
 								tracker = tracker + 1;
 
 								// <VID_ADDR_LEN>
 								uint8_t vid_len = recvBuffer[tracker];
-								printf("VID Address Length: %u |", recvBuffer[tracker]);
+								printf("VID Address Length: %u | ", vid_len);
 
 								// next byte
 								tracker = tracker + 1;
 
 								char vid_addr[vid_len];
 
-
 								memset(vid_addr, '\0', vid_len);
 								strncpy(vid_addr, &recvBuffer[tracker], vid_len);
-								printf("VID Address: %u |\n", recvBuffer[tracker]);
+								printf("VID Address: %s]\n", vid_addr);
 								vid_addr[vid_len] = '\0';
 								tracker += vid_len;
 

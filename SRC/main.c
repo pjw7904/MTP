@@ -185,11 +185,13 @@ void mtp_start() {
 			// send JOIN MSG if there are no VID entries in the Main VID Table.
 			if (isMain_VID_Table_Empty()) {
 				payloadLen = build_JOIN_MSG_PAYLOAD(payload);
+				printf("MTP [JOIN] MESSAGE SENT");
 			} else {
 				// send if entries already present in Main VID Table.
 				payloadLen = build_PERIODIC_MSG_PAYLOAD(payload);
 			}
 
+			//send the message (either a JOIN or periodic HELLO)
 			if (payloadLen) {
 				int i = 0;
 				for (; i < numberOfInterfaces; ++i) {

@@ -153,6 +153,10 @@ void mtp_start() {
 	time_t time_advt_beg;
 	time_t time_advt_fin;
 
+	//convergence time timers
+	time_t converge1_beg;
+	time_t converge1_fin;
+
 	// clear the memory
 	interfaceNames = (char**) calloc (MAX_INTERFACES* MAX_INTERFACES, sizeof(char));
 	deletedVIDs = (char**) calloc (MAX_VID_LIST * MAX_VID_LIST, sizeof(char));
@@ -170,9 +174,12 @@ void mtp_start() {
 	}
 
 	time(&time_advt_beg);
+	time(&converge1_beg);
 	while (true) {
 		time(&time_advt_fin);
 		// Send Hello Periodic, only if have atleast One VID in Main VID Table.
+		printf("At the top of the white loop")
+
 		if ((double)(difftime(time_advt_fin, time_advt_beg) >= PERIODIC_HELLO_TIME)) {
 			memset(interfaceNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
 			int numberOfInterfaces = getActiveInterfaces(interfaceNames);
@@ -305,8 +312,6 @@ void mtp_start() {
 				*/
 				case MTP_TYPE_PERODIC_MSG:
 					{
-						printf ("MTP [HELLO] MESSAGE RECIEVED\n");
-
 						// Record MAC ADDRESS, if not already present.
 						struct ether_addr src_mac;
 						bool retMainVID, retCPVID;
@@ -316,8 +321,10 @@ void mtp_start() {
 						retCPVID = update_hello_time_cpvid_LL(&src_mac);
 
 						if ( (retMainVID == true) || (retCPVID == true) ) {
+								printf ("MTP [HELLO KEEP-ALIVE] RECEIVED\n");
+						}
 
-						} else {
+						else {
 							if (!isRoot) {
 								uint8_t *payload = NULL;
 								int payloadLen = 0;
@@ -358,6 +365,7 @@ void mtp_start() {
 
 								// <VID_ADDR_LEN>
 								uint8_t vid_len = recvBuffer[tracker];
+								//why is this always coming out to be 5 when implemented?
 								printf("VID Address Length: %u | ", vid_len);
 
 								// next byte
@@ -422,7 +430,9 @@ void mtp_start() {
 											delete_MACentry_cpvid_LL(&new_node->mac);
 										}
 									}
-								} else {
+								}
+								printf("First VID Time: %f", (double)(difftime(converge1_fin, converge1_beg));
+								else {
 									// Dont do anything, may be a parent vid or duplicate
 								}
 								numberVIDS--;
@@ -514,6 +524,8 @@ void mtp_start() {
 						print_entries_bkp_LL();
 						print_entries_cpvid_LL();
 						print_entries_lbcast_LL();
+						//added spacing for clarity between updates
+						printf("----------------------------------------------------------\n");
 					}
 					break;
 

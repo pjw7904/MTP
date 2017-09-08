@@ -51,8 +51,7 @@ struct interface_tracker_t *interfaceTracker = NULL;
 //main function, protocol begins here
 int main (int argc, char** argv) {
 	char **interfaceNames;
-	//unix command test
-	system("echo test");
+
 	/*Check number of Arguments, after the program name
 	 *A "1" argument means that the switch is the root of a meshed tree, a "0" means that it is a child
 	 *If a "1" is specified first, then another argument has to be added that tells the program what the root VID is
@@ -176,6 +175,8 @@ void mtp_start() {
 
 	time(&time_advt_beg);
 	time(&converge1_beg);
+	//unix command test
+	system("echo 'START TIME:' date +%H:%M:%S:%N");
 	while (true) {
 		time(&time_advt_fin);
 		// Send Hello Periodic, only if have atleast One VID in Main VID Table.

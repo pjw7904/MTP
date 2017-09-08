@@ -4,11 +4,11 @@
 /* file locals */
 struct vid_addr_tuple *main_vid_tbl_head = NULL;
 //struct vid_addr_tuple *bkp_vid_tbl_head = NULL; // we can maintain backup paths in Main VID Table only, just a thought
-struct child_pvid_tuple *cpvid_tbl_head = NULL; 
+struct child_pvid_tuple *cpvid_tbl_head = NULL;
 struct local_bcast_tuple *local_bcast_head = NULL;
 
 /*
- *   isChild() - This method checks if the input VID param is child of any VID in Main 
+ *   isChild() - This method checks if the input VID param is child of any VID in Main
  * 		 table or backup vid table.
  *   @input
  *   param1 -   char *       vid
@@ -45,10 +45,10 @@ int isChild(char *vid) {
 
 			if (strncmp(vid, current->vid_addr, lenCurrentVID)==0) {
 				return 1;
-			} 
+			}
 			current = current->next;
 		}
-	} 
+	}
 	return -1;
 }
 
@@ -63,7 +63,7 @@ int isChild(char *vid) {
  *
  */
 
-// Message ordering <MSG_TYPE> <OPERATION> <NUMBER_VIDS>  <PATH COST> <VID_ADDR_LEN> <MAIN_TABLE_VID + EGRESS PORT> 
+// Message ordering <MSG_TYPE> <OPERATION> <NUMBER_VIDS>  <PATH COST> <VID_ADDR_LEN> <MAIN_TABLE_VID + EGRESS PORT>
 int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
   int payloadLen = 3;
   int numAdvts = 0;
@@ -115,7 +115,7 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
   }
 
   if (numAdvts > 0) {
-    // <MSG_TYPE> - Hello Join Message, Type - 3.
+    // <MSG_TYPE> - VID Advertisment, Type - 3.
     data[0] = (uint8_t) MTP_TYPE_VID_ADVT;
 
     // <OPERATION>
@@ -139,7 +139,7 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
  *   param1 - 	uint8_t       payload buffer
  *
  *   @output
- *   payloadLen	
+ *   payloadLen
  *
  */
 
@@ -160,7 +160,7 @@ int  build_JOIN_MSG_PAYLOAD(uint8_t *data) {
 /*
  *   build_PERIODIC_MSG_PAYLOAD - This message is sent every 2 seconds to inform connected
  *                                peers about its perscence.
- *                                
+ *
  *   @input
  *   param1 -   uint8_t           payload buffer
  *
@@ -219,7 +219,7 @@ int  build_VID_CHANGE_PAYLOAD(uint8_t *data, char *interface, char **deletedVIDs
     memset(vid_addr, '\0', VID_ADDR_LEN);
     //sprintf(vid_addr, "%s.%d", deletedVIDs[i], egressPort ); for now, lets see if don't append egress port
     sprintf(vid_addr, "%s", deletedVIDs[i]);
-    
+
     // <VID_ADDR_LEN>
     data[payloadLen] = strlen(vid_addr);
 
@@ -259,22 +259,22 @@ int  build_VID_CHANGE_PAYLOAD(uint8_t *data, char *interface, char **deletedVIDs
 
 // Message ordering <MSG_TYPE>
 bool isMain_VID_Table_Empty() {
-        
+
 	if (main_vid_tbl_head) {
 		return false;
 	}
-	
+
   return true;
 }
 
 /**
  * 		Add into the VID Table, new VID's are added based on the path cost.
- *     		VID Table,		Implemented Using linked list. 
+ *     		VID Table,		Implemented Using linked list.
  * 		Head Ptr,		*vid_table
- * 		@return 
+ * 		@return
  * 		< 3 			Successful Addition, addition in first 3 entries of Main VID Table
  * 		-1			Failure to add/ Already exists.
- * 		> 3   			Successful Addition, addition after first 3 entries of Main VID Table (Backup VID Table)		 	
+ * 		> 3   			Successful Addition, addition after first 3 entries of Main VID Table (Backup VID Table)
 **/
 
 int add_entry_LL(struct vid_addr_tuple *node) {
@@ -284,12 +284,13 @@ int add_entry_LL(struct vid_addr_tuple *node) {
 	if (!find_entry_LL(node)) {
 		if (main_vid_tbl_head == NULL) {
 			node->membership = 1;
+			//add first convergence time end
 			main_vid_tbl_head = node;
 			tracker++;
 		} else {
 			struct vid_addr_tuple *previous = NULL;
 
-			int mship = 0;	
+			int mship = 0;
 			// place in accordance with cost, lowest to highest.
 			while(current!=NULL && (current->path_cost < node->path_cost)) {
 				previous = current;
@@ -323,12 +324,12 @@ int add_entry_LL(struct vid_addr_tuple *node) {
 
 /**
  *		Check if the VID entry is already present in the table.
- *      VID Table,		Implemented Using linked list. 
- * 		Head Ptr,		*vid_table	
- *		
+ *      VID Table,		Implemented Using linked list.
+ * 		Head Ptr,		*vid_table
+ *
  *		@return
  *		true			Element Found.
- *		false			Element Not Found.	 	
+ *		false			Element Not Found.
 **/
 
 bool find_entry_LL(struct vid_addr_tuple *node) {
@@ -343,16 +344,16 @@ bool find_entry_LL(struct vid_addr_tuple *node) {
 			current = current->next;
 		}
 	}
-	return false;	
+	return false;
 }
 
 /**
  *		Print VID Table.
- *      	VID Table,		Implemented Using linked list. 
- * 		Head Ptr,		*vid_table	
- *		
+ *      	VID Table,		Implemented Using linked list.
+ * 		Head Ptr,		*vid_table
+ *
  *		@return
- *		void	
+ *		void
 **/
 
 void print_entries_LL() {
@@ -389,7 +390,7 @@ bool update_hello_time_LL(struct ether_addr *mac) {
     if (memcmp(&current->mac, mac, sizeof (struct ether_addr))==0) {
       current->last_updated = time(0);
       hasUpdates = true;
-    }	
+    }
   }
   return hasUpdates;
 }
@@ -507,11 +508,11 @@ struct vid_addr_tuple* getInstance_vid_tbl_LL() {
 /**
  *    Print VID Table.
  *    Backup VID Paths,    Implemented Using linked list, instead of maintaining a seperate table, I am adding Main VIDS and Backup Paths
- *                         in the same table. 
- *    Head Ptr,   *vid_table  
- *    
+ *                         in the same table.
+ *    Head Ptr,   *vid_table
+ *
  *    @return
- *    void  
+ *    void
 **/
 
 void print_entries_bkp_LL() {
@@ -544,7 +545,7 @@ bool add_entry_cpvid_LL(struct child_pvid_tuple *node) {
     cpvid_tbl_head = node;
     return true;
   } else if (update_entry_cpvid_LL(node))  {      // if already, there and there is PVID change.
-    
+
   } else {
     if (!find_entry_cpvid_LL(node)) {
       node->next = cpvid_tbl_head;
@@ -572,7 +573,7 @@ bool find_entry_cpvid_LL(struct child_pvid_tuple *node) {
     while (current != NULL) {
 
       if (strcmp(current->vid_addr, node->vid_addr) == 0) {
-        
+
         return true;
       }
 
@@ -622,7 +623,7 @@ struct child_pvid_tuple* getInstance_cpvid_LL() {
  *    Child PVID Table,    Implemented Using linked list.
  *    Head Ptr,   *cpvid_tbl_head
  *
- *    @input 
+ *    @input
  *    char * - cpvid to be deleted.
  *    @return
  *    struct child_pvid_tuple* - return reference of child pvid table.
@@ -631,7 +632,7 @@ struct child_pvid_tuple* getInstance_cpvid_LL() {
 bool delete_entry_cpvid_LL(char *cpvid_to_be_deleted) {
   struct child_pvid_tuple *current = cpvid_tbl_head;
   struct child_pvid_tuple *previous = NULL;
-  bool hasDeletions = false;  
+  bool hasDeletions = false;
 
   while (current != NULL) {
     if (strncmp(cpvid_to_be_deleted, current->vid_addr, strlen(cpvid_to_be_deleted)) == 0) {
@@ -659,7 +660,7 @@ bool delete_entry_cpvid_LL(char *cpvid_to_be_deleted) {
  *    Child PVID Table,    Implemented Using linked list.
  *    Head Ptr,   *cpvid_tbl_head
  *
- *    @input 
+ *    @input
  *    char * - cpvid to be deleted.
  *    @return
  *    struct child_pvid_tuple* - return reference of child pvid table.
@@ -821,7 +822,7 @@ bool find_entry_lbcast_LL(struct local_bcast_tuple *node) {
  *    Local Host broadcast Table,    Implemented Using linked list.
  *    Head Ptr,   *local_bcast_head
  *    @return
- *    void      
+ *    void
 **/
 
 void print_entries_lbcast_LL() {
@@ -842,7 +843,7 @@ void print_entries_lbcast_LL() {
  *    Head Ptr,   *local_bcast_head
  *    @return
  *    true  - if deletion successful.
- *    false - if deletion not successful.      
+ *    false - if deletion not successful.
 **/
 
 bool delete_entry_lbcast_LL(char *port) {
@@ -878,7 +879,7 @@ bool delete_entry_lbcast_LL(char *port) {
  *    Local Host broadcast Table,    Implemented Using linked list.
  *    Head Ptr,   *local_bcast_head
  *    @return
- *    struct local_bcast_tuple* - Returns reference to local host broadcast table.      
+ *    struct local_bcast_tuple* - Returns reference to local host broadcast table.
 **/
 
 struct local_bcast_tuple* getInstance_lbcast_LL() {

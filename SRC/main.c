@@ -51,7 +51,8 @@ struct interface_tracker_t *interfaceTracker = NULL;
 //main function, protocol begins here
 int main (int argc, char** argv) {
 	char **interfaceNames;
-
+	//unix command test
+	system("echo test");
 	/*Check number of Arguments, after the program name
 	 *A "1" argument means that the switch is the root of a meshed tree, a "0" means that it is a child
 	 *If a "1" is specified first, then another argument has to be added that tells the program what the root VID is
@@ -374,7 +375,7 @@ void mtp_start() {
 
 								memset(vid_addr, '\0', vid_len);
 								strncpy(vid_addr, &recvBuffer[tracker], vid_len);
-								printf("VID Address: %s]\n", vid_addr);
+								printf("VID Address: %s\n", vid_addr);
 								vid_addr[vid_len] = '\0';
 								tracker += vid_len;
 
@@ -418,6 +419,7 @@ void mtp_start() {
 									memcpy(&new_node->mac, (struct ether_addr *)&eheader->ether_shost, sizeof(struct ether_addr));
 
 									int mainVIDTracker = add_entry_LL(new_node);
+									time(&converge1_fin);
 									// Add into VID Table, if addition success, update all other connected peers about the change.
 									if (mainVIDTracker > 0) {
 										if (mainVIDTracker <= 3) {
@@ -429,7 +431,6 @@ void mtp_start() {
 											delete_MACentry_cpvid_LL(&new_node->mac);
 										}
 									}
-									time(&converge1_fin);
 									printf("VID added time: %f", (difftime(converge1_fin, converge1_beg)));
 								}
 								else {

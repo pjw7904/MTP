@@ -22,7 +22,7 @@
 #include <assert.h>
 
 #define VID_ADDR_LEN           20
-#define ETH_ADDR_LEN           5
+#define ETH_ADDR_LEN           5 //why is this 5 and not 6?
 #define MAX_BUFFER_SIZE        1024
 #define MAX_INTERFACES         8
 

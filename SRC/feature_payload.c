@@ -284,7 +284,11 @@ int add_entry_LL(struct vid_addr_tuple *node) {
 	if (!find_entry_LL(node)) {
 		if (main_vid_tbl_head == NULL) {
 			node->membership = 1;
-			system("echo 'END TIME:' date +%H:%M:%S:%N");
+
+			//timing unix commands
+			system("echo END TIME:");
+			system("date +%H:%M:%S:%N");
+
 			main_vid_tbl_head = node;
 			tracker++;
 		} else {

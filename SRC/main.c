@@ -175,8 +175,11 @@ void mtp_start() {
 
 	time(&time_advt_beg);
 	time(&converge1_beg);
-	//unix command test
-	system("echo 'START TIME:' date +%H:%M:%S:%N");
+
+	//timing unix commands
+	system("echo START TIME:");
+	system("date +%H:%M:%S:%N");
+
 	while (true) {
 		time(&time_advt_fin);
 		// Send Hello Periodic, only if have atleast One VID in Main VID Table.

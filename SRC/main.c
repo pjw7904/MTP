@@ -153,10 +153,6 @@ void mtp_start() {
 	time_t time_advt_beg;
 	time_t time_advt_fin;
 
-	//convergence time timers
-	time_t converge1_beg;
-	time_t converge1_fin;
-
 	// clear the memory
 	interfaceNames = (char**) calloc (MAX_INTERFACES* MAX_INTERFACES, sizeof(char));
 	deletedVIDs = (char**) calloc (MAX_VID_LIST * MAX_VID_LIST, sizeof(char));
@@ -174,7 +170,6 @@ void mtp_start() {
 	}
 
 	time(&time_advt_beg);
-	time(&converge1_beg);
 
 	//timing unix commands
 	system("echo START TIME:");
@@ -423,7 +418,6 @@ void mtp_start() {
 									memcpy(&new_node->mac, (struct ether_addr *)&eheader->ether_shost, sizeof(struct ether_addr));
 
 									int mainVIDTracker = add_entry_LL(new_node);
-									time(&converge1_fin);
 									// Add into VID Table, if addition success, update all other connected peers about the change.
 									if (mainVIDTracker > 0) {
 										if (mainVIDTracker <= 3) {
@@ -435,7 +429,7 @@ void mtp_start() {
 											delete_MACentry_cpvid_LL(&new_node->mac);
 										}
 									}
-									printf("VID added time: %f", (difftime(converge1_fin, converge1_beg)));
+
 								}
 								else {
 									// Dont do anything, may be a parent vid or duplicate

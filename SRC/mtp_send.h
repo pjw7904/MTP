@@ -16,6 +16,9 @@
 #include <net/if.h>
 #include <netinet/ether.h>
 
+//Possibly fixes the warning when compiling the code?
+#include <unistd.h>
+
 // Destination MAC address (Presently broadcast address)
 #define MY_DEST_MAC0	0xFF
 #define MY_DEST_MAC1	0xFF
@@ -28,7 +31,7 @@
 #define HEADER_SIZE		14
 
 /* Function Prototypes */
-int ctrlSend(char *, uint8_t *, int);  
+int ctrlSend(char *, uint8_t *, int);
 int dataSend(char *, uint8_t *, int);
 
 #endif

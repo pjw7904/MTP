@@ -205,6 +205,7 @@ int  build_VID_CHANGE_PAYLOAD(uint8_t *data, char *interface, char **deletedVIDs
   int egressPort = 0;
 
   // Port from where VID request came.
+	//confused as to what this is doing
   int i = 0;
   for(; interface[i]!='\0'; i++) {
     if(interface[i] >= 48 && interface[i] <= 57) {
@@ -232,7 +233,7 @@ int  build_VID_CHANGE_PAYLOAD(uint8_t *data, char *interface, char **deletedVIDs
   }
 
   if (numAdvts > 0) {
-    // <MSG_TYPE> - Hello Join Message, Type - 3.
+    // <MSG_TYPE> - Advertisment Message, Type - 3.
     data[0] = (uint8_t) MTP_TYPE_VID_ADVT;
 
     // <OPERATION>

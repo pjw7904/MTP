@@ -1,6 +1,7 @@
 #include "feature_payload.h"
 #include "mtp_send.h"
 
+extern struct timespec start, end;
 /* file locals */
 struct vid_addr_tuple *main_vid_tbl_head = NULL;
 //struct vid_addr_tuple *bkp_vid_tbl_head = NULL; // we can maintain backup paths in Main VID Table only, just a thought
@@ -73,27 +74,59 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
 
   // Port from where VID request came.
   int i;
+
+	/*
+	 * grabs the ascii value for each char in the interface name (ex: e, t, h, 1), [48 ascii = 0 decimal, 57 ascii = 9 decimal]
+	 * if the ascii value is in the range of the ascii values for 0-9, move the decimal number to the egress port and assign it
+	 */
   for(; interface[i]!='\0'; i++) {
-    if(interface[i] >= 48 && interface[i] <= 57) {
-      egressPort = (egressPort * 10) + (interface[i] - 48);
+		//print the interface here to check if eth0
+		//printf("interface being checked to build payload: %s\n", &interface[i]);
+    if(interface[i] > 48 && interface[i] <= 57) {
+      egressPort = (egressPort * 10) + (interface[i] - 48); //for example, (0 * 10) + (50 - 48) = 2 (the egress port)
+			//printf("this is the egress port for VID: %d", egressPort);
     }
   }
 
-  while (current != NULL) {
+  while (current != NULL)
+	{
+
+		if(egressPort == 0)
+		{
+			continue;
+		}
+
     char vid_addr[VID_ADDR_LEN];
 
+
+		//adding the n won't let the program start with the py script...
+		printf("\negressPort value entering while loop: %d\n", egressPort);
     // <PATH COST> - Taken as '1' for now
     data[payloadLen] = (uint8_t) (current->path_cost + 1);
 
     // next byte
     payloadLen = payloadLen + 1;
 
+		//this is where the '.0' problem is I believe
+		//egress port is set to zero by default, it must be looping back to it??
     memset(vid_addr, '\0', VID_ADDR_LEN);
-    if (strncmp(interface, current->eth_name, strlen(interface)) == 0) {
+
+		//finding current eth_name
+		printf("current eth name: %s\n", current->eth_name);
+
+    if (strncmp(interface, current->eth_name, strlen(interface)) == 0)
+		{
       sprintf(vid_addr, "%s", current->vid_addr );
-    } else {
-      sprintf(vid_addr, "%s.%d", current->vid_addr, egressPort );
+			printf("VID being added to payload (if): %s\n", vid_addr);
     }
+
+		else
+		{
+      sprintf(vid_addr, "%s.%d", current->vid_addr, egressPort);
+			printf("VID being added to payload (else): %s\n", vid_addr);
+    }
+
+		printf("VID being added to payload (final): %s\n\n", vid_addr);
 
     // <VID_ADDR_LEN>
     data[payloadLen] = strlen(vid_addr);
@@ -109,12 +142,14 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
 
     /* VID Advts should not be more than 3, because we need to advertise only the entries that are in Main VID Table
        from 3 we consider every path as backup path. */
-    if (numAdvts >=3 ) {
+    if (numAdvts >=3 )
+		{
         break;
     }
   }
 
-  if (numAdvts > 0) {
+  if (numAdvts > 0)
+	{
     // <MSG_TYPE> - VID Advertisment, Type - 3.
     data[0] = (uint8_t) MTP_TYPE_VID_ADVT;
 
@@ -123,7 +158,10 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
 
     // <NUMBER_VIDS> - Number of VID's
     data[2] = (uint8_t) numAdvts;
-  } else {
+  }
+
+	else
+	{
     payloadLen = 0;
   }
 
@@ -273,31 +311,70 @@ bool isMain_VID_Table_Empty() {
  *     		VID Table,		Implemented Using linked list.
  * 		Head Ptr,		*vid_table
  * 		@return
- * 		< 3 			Successful Addition, addition in first 3 entries of Main VID Table
+ * 		1 			Successful Addition, addition in first 3 entries of Main VID Table
  * 		-1			Failure to add/ Already exists.
- * 		> 3   			Successful Addition, addition after first 3 entries of Main VID Table (Backup VID Table)
+ * 		2   			Successful Addition, addition after first 3 entries of Main VID Table (Backup VID Table)
 **/
-
-int add_entry_LL(struct vid_addr_tuple *node) {
+int add_entry_LL(struct vid_addr_tuple *node)
+{
 	struct vid_addr_tuple *current = main_vid_tbl_head;
+
 	int tracker = 0;
 	// If the entry is not already present, we add it.
-	if (!find_entry_LL(node)) {
-		if (main_vid_tbl_head == NULL) {
+	if (!find_entry_LL(node))
+	{
+		clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+		uint64_t convergenceTime = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
+		//printf("end.tv_sec: %llu start.tv_sec: %llu end.tv_nsec: %ld start.tv_nsec: %ld\n", end.tv_sec, start.tv_sec, end.tv_nsec, start.tv_nsec);
+
+		FILE *f = fopen("convergenceTime.txt", "a");
+		if (f == NULL)
+		{
+    	printf("Error opening file!\n");
+		}
+
+		fprintf(f, "%" PRIu64 "\n", convergenceTime);
+		fclose(f);
+
+		printf("unsigned int 64 (PRIu64):\n");
+		printf("%" PRIu64 "\n", convergenceTime);
+
+		system("date +%H:%M:%S:%N >> convergenceTime.txt");
+
+		if (main_vid_tbl_head == NULL)
+		{
 			node->membership = 1;
 
 			//timing unix commands
-			system("echo END TIME:");
-			system("date +%H:%M:%S:%N");
+			//system("echo END TIME: >> MSTC.txt");
+			//system("date +%H:%M:%S:%N");
+			//system("date +%H:%M:%S:%N >> MSTC.txt");
 
+			//clock end time
+			/*
+			clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+			uint64_t convergenceTime = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
+			printf("end.tv_sec: %llu start.tv_sec: %llu end.tv_nsec: %ld start.tv_nsec: %ld\n", end.tv_sec, start.tv_sec, end.tv_nsec, start.tv_nsec);
+			printf("unsigned int 64 (PRIu64):\n");
+			printf("%" PRIu64 "\n", convergenceTime);
+			*/
 			main_vid_tbl_head = node;
+
+			char checkVID[30];
+			sprintf(checkVID, "echo %s >> convergenceTime.txt", node->vid_addr);
+			system(checkVID);
+
 			tracker++;
-		} else {
+		}
+
+		else
+		{
 			struct vid_addr_tuple *previous = NULL;
 
 			int mship = 0;
 			// place in accordance with cost, lowest to highest.
-			while(current!=NULL && (current->path_cost < node->path_cost)) {
+			while(current!=NULL && (current->path_cost < node->path_cost))
+			{
 				previous = current;
 				mship = current->membership;
 				current = current->next;
@@ -305,19 +382,24 @@ int add_entry_LL(struct vid_addr_tuple *node) {
 			}
 
 			// if new node has lowest cost.
-			if (previous == NULL) {
+			if (previous == NULL)
+			{
 				node->next = main_vid_tbl_head;
 				node->membership = 1;
 				main_vid_tbl_head = node;
 				tracker += 1;
-			} else {
+			}
+
+			else
+			{
 				previous->next = node;
 				node->next = current;
 				node->membership = (mship + 1);
 			}
 
 			// Increment the membership IDs of other VID's
-			while (current != NULL) {
+			while (current != NULL)
+			{
 				current->membership++;
 				current = current->next;
 			}
@@ -558,6 +640,8 @@ bool add_entry_cpvid_LL(struct child_pvid_tuple *node) {
       return true;
     }
   }
+	//9/19/17 - check to see if this is where the PVID addition is failing
+	printf("failed to add to CPVID: %s\n", node->vid_addr);
   return false;
 }
 

@@ -20,6 +20,7 @@
 #include <limits.h>
 #include <time.h>
 #include <assert.h>
+#include <inttypes.h>
 
 #define VID_ADDR_LEN           20
 #define ETH_ADDR_LEN           5 //why is this 5 and not 6?
@@ -71,7 +72,8 @@ struct interface_tracker_t {
 };*/
 
 /* Container for Child PVID Table */
-struct child_pvid_tuple {
+struct child_pvid_tuple
+{
 	char child_port[ETH_ADDR_LEN];  // Port name through which child is connected through
   char vid_addr[VID_ADDR_LEN];    // The VID of child, we might not need it, temporarily storing.
   struct ether_addr mac;

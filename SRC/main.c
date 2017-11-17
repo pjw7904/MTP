@@ -9,7 +9,6 @@
  */
 
 #include <stdio.h>
-
 #include <sys/types.h>
 #include <netdb.h>
 #include <netinet/if_ether.h>
@@ -559,10 +558,6 @@ void mtp_start()
 								//returns an int to tell protocol if VID is a child of a current main or backup table VID
 								int ret = isChild(vid_addr);
 								printf("ret = %d for VID address: %s\n", ret, vid_addr);
-
-								char checkret[3];
-								sprintf(checkret, "echo %d >> MSTC.txt", ret);
-							  system(checkret);
 
 								// if VID child ignore, incase part of PVID add to Child PVID table.
 								//1 - if is a child of one of VID's in main VID Table.

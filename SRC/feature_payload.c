@@ -88,12 +88,14 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
     }
   }
 
-  while (current != NULL)
-	{
+  while (current != NULL) {
 
+		//need to add statement to disregard if egress port is 0
+		//9/20/17 - issue was fixed by just adding the continue statement and removing the current = current->next
 		if(egressPort == 0)
 		{
 			continue;
+			//current = current->next;
 		}
 
     char vid_addr[VID_ADDR_LEN];
@@ -114,14 +116,10 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
 		//finding current eth_name
 		printf("current eth name: %s\n", current->eth_name);
 
-    if (strncmp(interface, current->eth_name, strlen(interface)) == 0)
-		{
+    if (strncmp(interface, current->eth_name, strlen(interface)) == 0) {
       sprintf(vid_addr, "%s", current->vid_addr );
 			printf("VID being added to payload (if): %s\n", vid_addr);
-    }
-
-		else
-		{
+    } else {
       sprintf(vid_addr, "%s.%d", current->vid_addr, egressPort);
 			printf("VID being added to payload (else): %s\n", vid_addr);
     }
@@ -142,14 +140,12 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
 
     /* VID Advts should not be more than 3, because we need to advertise only the entries that are in Main VID Table
        from 3 we consider every path as backup path. */
-    if (numAdvts >=3 )
-		{
+    if (numAdvts >=3 ) {
         break;
     }
   }
 
-  if (numAdvts > 0)
-	{
+  if (numAdvts > 0) {
     // <MSG_TYPE> - VID Advertisment, Type - 3.
     data[0] = (uint8_t) MTP_TYPE_VID_ADVT;
 
@@ -158,10 +154,7 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
 
     // <NUMBER_VIDS> - Number of VID's
     data[2] = (uint8_t) numAdvts;
-  }
-
-	else
-	{
+  } else {
     payloadLen = 0;
   }
 
@@ -315,6 +308,7 @@ bool isMain_VID_Table_Empty() {
  * 		-1			Failure to add/ Already exists.
  * 		2   			Successful Addition, addition after first 3 entries of Main VID Table (Backup VID Table)
 **/
+
 int add_entry_LL(struct vid_addr_tuple *node)
 {
 	struct vid_addr_tuple *current = main_vid_tbl_head;
@@ -323,48 +317,32 @@ int add_entry_LL(struct vid_addr_tuple *node)
 	// If the entry is not already present, we add it.
 	if (!find_entry_LL(node))
 	{
+		//------------------------convergence info---------------------------------
 		clock_gettime(CLOCK_MONOTONIC_RAW, &end);
 		uint64_t convergenceTime = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
-		//printf("end.tv_sec: %llu start.tv_sec: %llu end.tv_nsec: %ld start.tv_nsec: %ld\n", end.tv_sec, start.tv_sec, end.tv_nsec, start.tv_nsec);
-
 		FILE *f = fopen("convergenceTime.txt", "a");
 		if (f == NULL)
 		{
     	printf("Error opening file!\n");
 		}
-
 		fprintf(f, "%" PRIu64 "\n", convergenceTime);
 		fclose(f);
-
 		printf("unsigned int 64 (PRIu64):\n");
 		printf("%" PRIu64 "\n", convergenceTime);
-
 		system("date +%H:%M:%S:%N >> convergenceTime.txt");
+		//-------------------------------------------------------------------------
 
 		if (main_vid_tbl_head == NULL)
 		{
 			node->membership = 1;
-
-			//timing unix commands
-			//system("echo END TIME: >> MSTC.txt");
-			//system("date +%H:%M:%S:%N");
-			//system("date +%H:%M:%S:%N >> MSTC.txt");
-
-			//clock end time
-			/*
-			clock_gettime(CLOCK_MONOTONIC_RAW, &end);
-			uint64_t convergenceTime = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
-			printf("end.tv_sec: %llu start.tv_sec: %llu end.tv_nsec: %ld start.tv_nsec: %ld\n", end.tv_sec, start.tv_sec, end.tv_nsec, start.tv_nsec);
-			printf("unsigned int 64 (PRIu64):\n");
-			printf("%" PRIu64 "\n", convergenceTime);
-			*/
 			main_vid_tbl_head = node;
 
 			char checkVID[30];
 			sprintf(checkVID, "echo %s >> convergenceTime.txt", node->vid_addr);
 			system(checkVID);
 
-			tracker++;
+			//tracker++;
+			tracker = 1;
 		}
 
 		else
@@ -378,7 +356,7 @@ int add_entry_LL(struct vid_addr_tuple *node)
 				previous = current;
 				mship = current->membership;
 				current = current->next;
-				tracker += 1;
+				//tracker += 1;
 			}
 
 			// if new node has lowest cost.
@@ -387,7 +365,8 @@ int add_entry_LL(struct vid_addr_tuple *node)
 				node->next = main_vid_tbl_head;
 				node->membership = 1;
 				main_vid_tbl_head = node;
-				tracker += 1;
+				//tracker += 1;
+				tracker = 1;
 			}
 
 			else
@@ -395,6 +374,16 @@ int add_entry_LL(struct vid_addr_tuple *node)
 				previous->next = node;
 				node->next = current;
 				node->membership = (mship + 1);
+
+				if(node->membership <= 3)
+				{
+					tracker = 1;
+				}
+
+				else
+				{
+					tracker = 2;
+				}
 			}
 
 			// Increment the membership IDs of other VID's

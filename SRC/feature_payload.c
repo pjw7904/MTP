@@ -2,9 +2,7 @@
 #include "mtp_send.h"
 
 extern struct timespec start, end;
-/* file locals */
 struct vid_addr_tuple *main_vid_tbl_head = NULL;
-//struct vid_addr_tuple *bkp_vid_tbl_head = NULL; // we can maintain backup paths in Main VID Table only, just a thought
 struct child_pvid_tuple *cpvid_tbl_head = NULL;
 struct local_bcast_tuple *local_bcast_head = NULL;
 
@@ -21,32 +19,36 @@ struct local_bcast_tuple *local_bcast_head = NULL;
  *  -1  - if VID is not child of any of the VID's in the main VID Table.
  *
  */
-
-int isChild(char *vid) {
+int isChild(char *vid)
+{
 
 	// For now just checking only the Main VID table.
-	if (main_vid_tbl_head != NULL) {
+	if (main_vid_tbl_head != NULL)
+	{
 		struct vid_addr_tuple *current = main_vid_tbl_head;
 
-		while (current != NULL){
+		while (current != NULL)
+		{
 		  int lenInputVID = strlen(vid);
       int lenCurrentVID = strlen(current->vid_addr);
 
       // This check is mainly if we get a parent ID, we have eliminate this as the VID is a parent ID.
-      if (lenCurrentVID > lenInputVID && strncmp(current->vid_addr, vid, lenInputVID) == 0) {
+      if (lenCurrentVID > lenInputVID && strncmp(current->vid_addr, vid, lenInputVID) == 0)
+			{
         lenCurrentVID = lenInputVID;
         return 0;
       }
 
       // if length is same and are similar then its a duplicate no need to add.
-      if ((lenInputVID == lenCurrentVID) && (strncmp(vid, current->vid_addr, lenCurrentVID)==0)) {
-
+      if ((lenInputVID == lenCurrentVID) && (strncmp(vid, current->vid_addr, lenCurrentVID)==0))
+			{
         return 2;
       }
 
 			if (strncmp(vid, current->vid_addr, lenCurrentVID)==0) {
 				return 1;
 			}
+
 			current = current->next;
 		}
 	}
@@ -65,7 +67,8 @@ int isChild(char *vid) {
  */
 
 // Message ordering <MSG_TYPE> <OPERATION> <NUMBER_VIDS>  <PATH COST> <VID_ADDR_LEN> <MAIN_TABLE_VID + EGRESS PORT>
-int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
+int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface)
+{
   int payloadLen = 3;
   int numAdvts = 0;
   int egressPort = 0;
@@ -79,52 +82,57 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
 	 * grabs the ascii value for each char in the interface name (ex: e, t, h, 1), [48 ascii = 0 decimal, 57 ascii = 9 decimal]
 	 * if the ascii value is in the range of the ascii values for 0-9, move the decimal number to the egress port and assign it
 	 */
-  for(; interface[i]!='\0'; i++) {
+  for(; interface[i]!='\0'; i++)
+	{
 		//print the interface here to check if eth0
 		//printf("interface being checked to build payload: %s\n", &interface[i]);
-    if(interface[i] > 48 && interface[i] <= 57) {
+    if(interface[i] > 48 && interface[i] <= 57)
+		{
       egressPort = (egressPort * 10) + (interface[i] - 48); //for example, (0 * 10) + (50 - 48) = 2 (the egress port)
 			//printf("this is the egress port for VID: %d", egressPort);
     }
   }
 
-  while (current != NULL) {
-
+  //while (current != NULL)
+	while (current != NULL && current->membership <= 3)
+	{
 		//need to add statement to disregard if egress port is 0
 		//9/20/17 - issue was fixed by just adding the continue statement and removing the current = current->next
 		if(egressPort == 0)
 		{
 			continue;
-			//current = current->next;
 		}
+
+		printf("VID being looked at: %s", current->vid_addr);
 
     char vid_addr[VID_ADDR_LEN];
 
-
 		//adding the n won't let the program start with the py script...
-		printf("\negressPort value entering while loop: %d\n", egressPort);
+		printf("\n[egressPort value entering while loop: %d\n", egressPort);
     // <PATH COST> - Taken as '1' for now
     data[payloadLen] = (uint8_t) (current->path_cost + 1);
 
     // next byte
     payloadLen = payloadLen + 1;
 
-		//this is where the '.0' problem is I believe
-		//egress port is set to zero by default, it must be looping back to it??
     memset(vid_addr, '\0', VID_ADDR_LEN);
 
 		//finding current eth_name
-		printf("current eth name: %s\n", current->eth_name);
+		//printf("current eth name: %s\n", current->eth_name);
 
-    if (strncmp(interface, current->eth_name, strlen(interface)) == 0) {
-      sprintf(vid_addr, "%s", current->vid_addr );
-			printf("VID being added to payload (if): %s\n", vid_addr);
-    } else {
-      sprintf(vid_addr, "%s.%d", current->vid_addr, egressPort);
-			printf("VID being added to payload (else): %s\n", vid_addr);
+    if (strncmp(interface, current->eth_name, strlen(interface)) == 0)
+		{
+      sprintf(vid_addr, "%s", current->vid_addr);
+			//printf("VID being added to payload (if): %s\n", vid_addr);
     }
 
-		printf("VID being added to payload (final): %s\n\n", vid_addr);
+		else
+		{
+      sprintf(vid_addr, "%s.%d", current->vid_addr, egressPort);
+			//printf("VID being added to payload (else): %s\n", vid_addr);
+    }
+
+		printf("VID being added to payload (final): %s]\n", vid_addr);
 
     // <VID_ADDR_LEN>
     data[payloadLen] = strlen(vid_addr);
@@ -136,16 +144,22 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
 
     payloadLen += strlen(vid_addr);
     current = current->next;
+
     numAdvts++;
+
+		printf("numAdvts = %d\n", numAdvts);
 
     /* VID Advts should not be more than 3, because we need to advertise only the entries that are in Main VID Table
        from 3 we consider every path as backup path. */
-    if (numAdvts >=3 ) {
+    if (numAdvts == 3)
+		{
+				printf("hit the break\n");
         break;
     }
-  }
+  } // end of while loop
 
-  if (numAdvts > 0) {
+  if (numAdvts > 0)
+	{
     // <MSG_TYPE> - VID Advertisment, Type - 3.
     data[0] = (uint8_t) MTP_TYPE_VID_ADVT;
 
@@ -154,7 +168,10 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface) {
 
     // <NUMBER_VIDS> - Number of VID's
     data[2] = (uint8_t) numAdvts;
-  } else {
+  }
+
+	else
+	{
     payloadLen = 0;
   }
 
@@ -230,26 +247,28 @@ int  build_PERIODIC_MSG_PAYLOAD(uint8_t *data) {
  */
 
 // Message ordering <MSG_TYPE> <OPERATION> <NUMBER_VIDS> <VID_ADDR_LEN> <MAIN_TABLE_VID + EGRESS PORT>
-int  build_VID_CHANGE_PAYLOAD(uint8_t *data, char *interface, char **deletedVIDs, int numberOfDeletions) {
+int  build_VID_CHANGE_PAYLOAD(uint8_t *data, char *interface, char **deletedVIDs, int numberOfDeletions)
+{
   int payloadLen = 3;
   int numAdvts = 0;
   int egressPort = 0;
 
-  // Port from where VID request came.
-	//confused as to what this is doing
   int i = 0;
-  for(; interface[i]!='\0'; i++) {
-    if(interface[i] >= 48 && interface[i] <= 57) {
+  for(; interface[i]!='\0'; i++)
+	{
+    if(interface[i] >= 48 && interface[i] <= 57)
+		{
       egressPort = (egressPort * 10) + (interface[i] - 48);
     }
   }
 
   i = 0;
-  for (; i < numberOfDeletions; i++) {
+  for (; i < numberOfDeletions; i++)
+	{
     char vid_addr[VID_ADDR_LEN];
 
     memset(vid_addr, '\0', VID_ADDR_LEN);
-    //sprintf(vid_addr, "%s.%d", deletedVIDs[i], egressPort ); for now, lets see if don't append egress port
+    //sprintf(vid_addr, "%s.%d", deletedVIDs[i], egressPort ); for now, lets see if doesn't append egress port
     sprintf(vid_addr, "%s", deletedVIDs[i]);
 
     // <VID_ADDR_LEN>
@@ -263,7 +282,8 @@ int  build_VID_CHANGE_PAYLOAD(uint8_t *data, char *interface, char **deletedVIDs
     numAdvts++;
   }
 
-  if (numAdvts > 0) {
+  if (numAdvts > 0)
+	{
     // <MSG_TYPE> - Advertisment Message, Type - 3.
     data[0] = (uint8_t) MTP_TYPE_VID_ADVT;
 
@@ -272,7 +292,10 @@ int  build_VID_CHANGE_PAYLOAD(uint8_t *data, char *interface, char **deletedVIDs
 
     // <NUMBER_VIDS> - Number of VID's
     data[2] = (uint8_t) numAdvts;
-  } else {
+  }
+
+	else
+	{
     payloadLen = 0;
   }
 
@@ -290,9 +313,10 @@ int  build_VID_CHANGE_PAYLOAD(uint8_t *data, char *interface, char **deletedVIDs
  */
 
 // Message ordering <MSG_TYPE>
-bool isMain_VID_Table_Empty() {
-
-	if (main_vid_tbl_head) {
+bool isMain_VID_Table_Empty()
+{
+	if (main_vid_tbl_head)
+	{
 		return false;
 	}
 
@@ -304,14 +328,16 @@ bool isMain_VID_Table_Empty() {
  *     		VID Table,		Implemented Using linked list.
  * 		Head Ptr,		*vid_table
  * 		@return
+ *   -1			  Failure to add/ Already exists.
  * 		1 			Successful Addition, addition in first 3 entries of Main VID Table
- * 		-1			Failure to add/ Already exists.
- * 		2   			Successful Addition, addition after first 3 entries of Main VID Table (Backup VID Table)
+ * 		2   	  Successful Addition, addition after first 3 entries of Main VID Table (Backup VID Table)
+ *		3       Successful Addtion, but more than the limit of 6 VID's total (3 in main, 3 in backup)
 **/
 
 int add_entry_LL(struct vid_addr_tuple *node)
 {
 	struct vid_addr_tuple *current = main_vid_tbl_head;
+	bool VIDpruning = false;
 
 	int tracker = 0;
 	// If the entry is not already present, we add it.
@@ -348,8 +374,8 @@ int add_entry_LL(struct vid_addr_tuple *node)
 		else
 		{
 			struct vid_addr_tuple *previous = NULL;
-
 			int mship = 0;
+
 			// place in accordance with cost, lowest to highest.
 			while(current!=NULL && (current->path_cost < node->path_cost))
 			{
@@ -380,7 +406,7 @@ int add_entry_LL(struct vid_addr_tuple *node)
 					tracker = 1;
 				}
 
-				else
+				else if(node->membership > 3 && node->membership <= 6)
 				{
 					tracker = 2;
 				}
@@ -391,6 +417,18 @@ int add_entry_LL(struct vid_addr_tuple *node)
 			{
 				current->membership++;
 				current = current->next;
+			}
+
+			//gobble
+			if(sizeOfVIDTable() > MAX_VID_ENTRIES)
+			{
+				for (current = main_vid_tbl_head; current != NULL; current = current->next)
+				{
+					if(current->membership > MAX_VID_ENTRIES)
+					{
+						delete_entry_LL(current->vid_addr);
+					}
+				}
 			}
 		}
 		return tracker;
@@ -408,11 +446,15 @@ int add_entry_LL(struct vid_addr_tuple *node)
  *		false			Element Not Found.
 **/
 
-bool find_entry_LL(struct vid_addr_tuple *node) {
-	if (main_vid_tbl_head != NULL) {
+bool find_entry_LL(struct vid_addr_tuple *node)
+{
+	if (main_vid_tbl_head != NULL)
+	{
 		struct vid_addr_tuple *current = main_vid_tbl_head;
-		while (current != NULL) {
-			if (strcmp(current->vid_addr, node->vid_addr) == 0) {
+		while (current != NULL)
+		{
+			if (strcmp(current->vid_addr, node->vid_addr) == 0)
+			{
 				// Update time stamp.
 				current->last_updated = time(0);
 				return true;
@@ -432,17 +474,23 @@ bool find_entry_LL(struct vid_addr_tuple *node) {
  *		void
 **/
 
-void print_entries_LL() {
+void print_entries_LL()
+{
   struct vid_addr_tuple *current;
   int tracker = MAX_MAIN_VID_TBL_PATHS;
 
   printf("\n#######Main VID Table#########\n");
   printf("MT_VID\t\t\t\tEthname\t\t\tPath Cost\tMembership\tMAC\n");
 
-  for (current = main_vid_tbl_head; current != NULL; current = current->next) {
-    if (tracker <= 0) {
+  for (current = main_vid_tbl_head; current != NULL; current = current->next)
+	{
+    if (tracker <= 0)
+		{
       break;
-    } else {
+    }
+
+		else
+		{
       printf("%s\t\t\t\t%s\t\t\t%d\t\t%d\t\t%s\n", current->vid_addr, current->eth_name, current->path_cost, current->membership, ether_ntoa(&current->mac) );
       tracker--;
     }
@@ -458,12 +506,15 @@ void print_entries_LL() {
  *              bool
 **/
 
-bool update_hello_time_LL(struct ether_addr *mac) {
+bool update_hello_time_LL(struct ether_addr *mac)
+{
   struct vid_addr_tuple *current;
   bool hasUpdates = false;
 
-  for (current = main_vid_tbl_head; current != NULL; current = current->next) {
-    if (memcmp(&current->mac, mac, sizeof (struct ether_addr))==0) {
+  for (current = main_vid_tbl_head; current != NULL; current = current->next)
+	{
+    if (memcmp(&current->mac, mac, sizeof (struct ether_addr))==0)
+		{
       current->last_updated = time(0);
       hasUpdates = true;
     }
@@ -480,7 +531,8 @@ bool update_hello_time_LL(struct ether_addr *mac) {
  *              void
 **/
 
-int checkForFailures(char **deletedVIDs) {
+int checkForFailures(char **deletedVIDs)
+{
   struct vid_addr_tuple *current = main_vid_tbl_head;
   struct vid_addr_tuple *previous = NULL;
   time_t currentTime = time(0);
@@ -522,32 +574,40 @@ int checkForFailures(char **deletedVIDs) {
  *              Head Ptr,               *vid_table
  *
  *              @return
- *              true - if deletion is successful.
+ *              true - if deletion in main VID table occurs
  *              false - if deletion fails.
 **/
-
-bool delete_entry_LL(char *vid_to_delete) {
+bool delete_entry_LL(char *vid_to_delete)
+{
   struct vid_addr_tuple *current = main_vid_tbl_head;
   struct vid_addr_tuple *previous = NULL;
   bool hasDeletionsInMainVID = false; // top 3
   int hasDeletions = false;
   int tracker = 0;
 
-  while (current != NULL) {
+  while (current != NULL)
+	{
 	  tracker += 1;
-	  if (strncmp(vid_to_delete, current->vid_addr, strlen(vid_to_delete)) == 0) {
+	  if (strncmp(vid_to_delete, current->vid_addr, strlen(vid_to_delete)) == 0)
+		{
 		  struct vid_addr_tuple *temp = current;
 
-		  if (previous == NULL) {
+		  if (previous == NULL)
+			{
 			  main_vid_tbl_head = current->next;
-		  } else {
+		  }
+
+			else
+			{
 			  previous->next = current->next;
 		  }
 
 		  current = current->next;
-		  if (tracker > 0 && tracker <= 3) {
-			hasDeletionsInMainVID  = true;
+		  if (tracker > 0 && tracker <= 3)
+			{
+				hasDeletionsInMainVID  = true;
 		  }
+
 		  hasDeletions = true;
 		  free(temp);
 		  continue;
@@ -557,13 +617,16 @@ bool delete_entry_LL(char *vid_to_delete) {
   }
 
   // fix any wrong membership values.
-  if (hasDeletions) {
+  if (hasDeletions)
+	{
     int membership = 1;
-    for (current = main_vid_tbl_head; current != NULL; current = current->next) {
+    for (current = main_vid_tbl_head; current != NULL; current = current->next)
+		{
       current->membership = membership;
       membership++;
     }
   }
+
   return hasDeletionsInMainVID;
 }
 
@@ -576,8 +639,8 @@ bool delete_entry_LL(char *vid_to_delete) {
  *              @return
  *              struct main_vid_tbl_head* - reference of main vid table.
 **/
-
-struct vid_addr_tuple* getInstance_vid_tbl_LL() {
+struct vid_addr_tuple* getInstance_vid_tbl_LL()
+{
   return main_vid_tbl_head;
 }
 
@@ -590,18 +653,23 @@ struct vid_addr_tuple* getInstance_vid_tbl_LL() {
  *    @return
  *    void
 **/
-
-void print_entries_bkp_LL() {
+void print_entries_bkp_LL()
+{
   struct vid_addr_tuple *current;
   int tracker = MAX_MAIN_VID_TBL_PATHS;
 
   printf("\n#######Backup VID Table#########\n");
   printf("MT_VID\t\t\t\tEthname\t\t\tPath Cost\tMembership\tMAC\n");
 
-  for (current = main_vid_tbl_head; current != NULL; current = current->next) {
-    if (tracker <= 0) {
-      printf("%s\t\t\t\t%s\t\t\t%d\t\t%d\t\t%s\n", current->vid_addr, current->eth_name, current->path_cost, current->membership, ether_ntoa(&current->mac) );
-    } else {
+  for (current = main_vid_tbl_head; current != NULL; current = current->next)
+	{
+    if (tracker <= 0)
+		{
+      printf("%s\t\t\t\t%s\t\t\t%d\t\t%d\t\t%s\n", current->vid_addr, current->eth_name, current->path_cost, current->membership, ether_ntoa(&current->mac));
+    }
+
+		else
+		{
       tracker--;
     }
   }
@@ -616,7 +684,8 @@ void print_entries_bkp_LL() {
  *    false     Failure to add/ Already exists.
 **/
 
-bool add_entry_cpvid_LL(struct child_pvid_tuple *node) {
+bool add_entry_cpvid_LL(struct child_pvid_tuple *node)
+{
   if (cpvid_tbl_head == NULL) {
     cpvid_tbl_head = node;
     return true;
@@ -691,8 +760,8 @@ void print_entries_cpvid_LL() {
  *    struct child_pvid_tuple* - return reference of child pvid table.
 **/
 
-struct child_pvid_tuple* getInstance_cpvid_LL() {
-
+struct child_pvid_tuple* getInstance_cpvid_LL()
+{
   return cpvid_tbl_head;
 }
 
@@ -903,14 +972,15 @@ bool find_entry_lbcast_LL(struct local_bcast_tuple *node) {
  *    void
 **/
 
-void print_entries_lbcast_LL() {
+void print_entries_lbcast_LL()
+{
   struct local_bcast_tuple *current;
-
 
   printf("\n#######Local Host Broadcast Table#########\n");
   printf("PORT\n");
 
-  for (current = local_bcast_head; current != NULL; current = current->next) {
+  for (current = local_bcast_head; current != NULL; current = current->next)
+	{
     printf("%s\n", current->eth_name);
   }
 }
@@ -960,6 +1030,23 @@ bool delete_entry_lbcast_LL(char *port) {
  *    struct local_bcast_tuple* - Returns reference to local host broadcast table.
 **/
 
-struct local_bcast_tuple* getInstance_lbcast_LL() {
+struct local_bcast_tuple* getInstance_lbcast_LL()
+{
   return local_bcast_head;
+}
+
+//PETER FUNCTIONS:
+//make sure to add a functional prototype in feature_payload.h FOR ALL ADDED FUNCTIONS!!!!
+
+int sizeOfVIDTable()
+{
+	int size = 0;
+	struct vid_addr_tuple *current;
+
+  for (current = main_vid_tbl_head; current != NULL; current = current->next)
+	{
+		size++;
+	}
+
+	return size;
 }

@@ -230,8 +230,6 @@ void mtp_start()
 	system("echo START TIME: >> MSTC.txt");
 	system("date +%H:%M:%S:%N >> MSTC.txt");
 
-
-
 	while (true)
 	{
 
@@ -270,7 +268,6 @@ void mtp_start()
 
 		else if((double)(difftime(time_advt_fin, time_advt_beg) >= PERIODIC_HELLO_TIME))
 		{
-
 			memset(interfaceNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
 			int numberOfInterfaces = getActiveInterfaces(interfaceNames);
 			uint8_t *payload = NULL;
@@ -303,7 +300,6 @@ void mtp_start()
 
 			// check for failures and delete if any VID exceeds periodic hello by (PERIODIC_HELLO_TIME * 3)
 			int numberOfDeletions = checkForFailures(deletedVIDs);
-
 			bool hasCPVIDDeletions = checkForFailuresCPVID();
 
 			if ( numberOfDeletions != 0)
@@ -338,7 +334,6 @@ void mtp_start()
 
 				if (c1 != NULL)
 				{
-
 					payload = (uint8_t*) calloc (1, MAX_BUFFER_SIZE);
 					print_entries_LL();
 					payloadLen = build_VID_ADVT_PAYLOAD(payload, c1->eth_name);
@@ -510,19 +505,42 @@ void mtp_start()
 						sprintf(eth, "echo %s >> MSTC.txt", recvOnEtherPort);
 						system(eth);
 
+						//gobble - keep an update on main VID table
+						printf("size of VID table: %d", sizeOfVIDTable());
+
+						if(sizeOfVIDTable() > 3)
+						{
+							struct vid_addr_tuple *currentTable =  getInstance_vid_tbl_LL();
+							int i = 0;
+							char *mainVIDs[3];
+							for(i = 0; i < 3; i++)
+							{
+								mainVIDs[i] = currentTable->vid_addr;
+								currentTable = currentTable->next;
+							}
+
+							printf("current main table: ");
+							for(i = 0; i < 3; i++)
+							{
+								printf("%s\n" ,mainVIDs[i]);
+							}
+						}
+
+						//1. do another struct for updatedTable after the additions and such
+						//2. strcmp the two, and if there is a difference, ADVT DEL for VID
+
 						printf ("\n[MTP VID INFO RECIEVED: ");
 
 						//second byte of the MTP payload is the Operation field, adding a VID (VID_ADD) = 1, removing a VID = 2
 						uint8_t operation = (uint8_t) recvBuffer[15];
 
-						system("echo [made to checking op] >> MSTC.txt");
+						//system("echo [made to checking op] >> MSTC.txt");
 						if (operation == VID_ADD)
 						{
-
 							uint8_t numberVIDS = (uint8_t) recvBuffer[16];
-							//printf ("numberVIDS %u\n", numberVIDS);
 							int tracker = 17;
 							bool hasAdditions = false;
+							bool mainVIDTableChange = false;
 
 							//running through all of the VID's recieved in the ADVT
 							while (numberVIDS != 0)
@@ -545,22 +563,20 @@ void mtp_start()
 								char vid_addr[vid_len];
 								memset(vid_addr, '\0', vid_len);
 								strncpy(vid_addr, &recvBuffer[tracker], vid_len);
+								vid_addr[vid_len] = '\0';
+
 								printf("VID Address: %s]\n", vid_addr);
-								//printing for MSTC.txt
 								char checkVID[30];
 								sprintf(checkVID, "echo %s >> MSTC.txt", vid_addr);
 							  system(checkVID);
 
-								vid_addr[vid_len] = '\0';
 								// next byte after length of VID
 								tracker += vid_len;
 
 								//returns an int to tell protocol if VID is a child of a current main or backup table VID
 								int ret = isChild(vid_addr);
-								printf("ret = %d for VID address: %s\n", ret, vid_addr);
 
 								// if VID child ignore, incase part of PVID add to Child PVID table.
-								//1 - if is a child of one of VID's in main VID Table.
 								if ( ret == 1)
 								{
 									// if this is the first VID in the table and is a child, we have to add into child PVID Table
@@ -581,36 +597,35 @@ void mtp_start()
 										{
 											//09/19/17 - added comment to see if child is being added to root CPVID table without it being printed
 											printf("this is being added to CPVID: %s\n", vid_addr);
-											system("This is going into the CPVID table >> MSTC.txt");
+											system("echo [Added to CPVID table] >> MSTC.txt");
 										}
 
 										else
 										{ // if already there deallocate node memory
 											printf("this is being deleted? CPVID: %s\n", vid_addr);
-											system("Already in CPVID table >> MSTC.txt");
+											system("echo [Already in CPVID table] >> MSTC.txt");
 											free(new_cpvid);
 										}
 									}
 								}
 
 								// Add to Main VID Table, if not a child, make it PVID if there is no better path already in the table.
-								//-1 - if VID is not child of any of the VID's in the main VID Table.
 								else if ( ret == -1)
 								{
 
 									// Allocate memory and intialize(calloc).
 									struct vid_addr_tuple *new_node = (struct vid_addr_tuple*) calloc (1, sizeof(struct vid_addr_tuple));
 
-									// Fill data.
-									strncpy(new_node->vid_addr, vid_addr, strlen(vid_addr));
-									strncpy(new_node->eth_name, recvOnEtherPort, strlen(recvOnEtherPort));
+									// Fill in data for new VID
+									strncpy(new_node->vid_addr, vid_addr, strlen(vid_addr)); //VID Address
+									strncpy(new_node->eth_name, recvOnEtherPort, strlen(recvOnEtherPort)); //Incoming Ethernet Port Name
 									new_node->last_updated = time(0); // current timestamp
-									new_node->port_status = PVID_PORT;
-									new_node->next = NULL;
-									new_node->isNew = true;
+									new_node->port_status = PVID_PORT; //Port Type
+									new_node->next = NULL; //Linked List Hook
+									new_node->isNew = true; //Is New
 									new_node->membership = 0;	 // Intialize with '0', will find outpreference based on cost during add method.
-									new_node->path_cost = (uint8_t) path_cost;
-									memcpy(&new_node->mac, (struct ether_addr *)&eheader->ether_shost, sizeof(struct ether_addr));
+									new_node->path_cost = (uint8_t) path_cost; //Path Cost
+									memcpy(&new_node->mac, (struct ether_addr *)&eheader->ether_shost, sizeof(struct ether_addr)); //Source MAC address of VID ADVT
 
 									// Add into VID Table, if addition success, update all other connected peers about the change.
 									int mainVIDTracker = add_entry_LL(new_node);
@@ -632,6 +647,13 @@ void mtp_start()
 											// Check PVID used by peer is a derived PVID from me.
 											delete_MACentry_cpvid_LL(&new_node->mac);
 										}
+
+										//gobble - new addition to limit to 6
+										//if(mainVIDTracker == 3)
+										//{
+											//delete_entry_LL(vid_addr);
+											//system("echo [deleted extra VID] >> MSTC.txt");
+										//}
 									}
 								}
 
@@ -640,13 +662,13 @@ void mtp_start()
 									// Dont do anything, may be a parent vid or duplicate
 									//this is inefficent...
 
-									system("echo [hit the else] >> MSTC.txt");
+									//system("echo [hit the else] >> MSTC.txt");
 								}
 
 								numberVIDS--;
 							}
 
-							system("echo [made to after while loop before hasAdditions] >> MSTC.txt");
+							//system("echo [made to after while loop before hasAdditions] >> MSTC.txt");
 							if(hasAdditions)
 							{
 
@@ -697,7 +719,7 @@ void mtp_start()
 								free(payload);
 							// ----------------------------------REST OF INTERFACES END------------------------------
 							}
-							system("echo [made to the end of VID add] >> MSTC.txt");
+							//system("echo [made to the end of VID add] >> MSTC.txt");
 						}
 
 						else if (operation == VID_DEL)
@@ -775,7 +797,7 @@ void mtp_start()
 									free(payload);
 								}
 							}
-							system("echo [made to the end of VID del] >> MSTC.txt");
+							//system("echo [made to the end of VID del] >> MSTC.txt");
 						}
 
 						else
@@ -855,9 +877,11 @@ void mtp_start()
 				}
 
 				// Next Send it port from where current PVID is acquired, if it is not same as the received port.
-				if (!isRoot) {
+				if (!isRoot)
+				{
 					struct vid_addr_tuple* vid_t = getInstance_vid_tbl_LL();
-					if (strcmp(vid_t->eth_name, recvOnEtherPort) != 0) {
+					if (strcmp(vid_t->eth_name, recvOnEtherPort) != 0)
+					{
 						dataSend(vid_t->eth_name, recvBuffer, recv_len);
 						printf("Sent to PVID%s\n", vid_t->eth_name);
 					}

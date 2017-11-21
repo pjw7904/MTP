@@ -32,6 +32,7 @@
 #define MTP_TYPE_VID_ADVT	      3
 
 #define MAX_MAIN_VID_TBL_PATHS  3
+#define MAX_VID_ENTRIES 				6
 
 #define VID_ADD			            1
 #define VID_DEL			            2
@@ -48,7 +49,8 @@
 #define HOST_PORT               2
 
 /* Container for VID Table */
-struct vid_addr_tuple {
+struct vid_addr_tuple
+{
 	char eth_name[ETH_ADDR_LEN]; 	// Port of Acquisition
 	char vid_addr[VID_ADDR_LEN];	// VID Address.
 	time_t last_updated;      	// last updated time
@@ -60,7 +62,8 @@ struct vid_addr_tuple {
 	int membership;			// Membership PRIMARY, SECONDARY, TERTIARY
 };
 
-struct interface_tracker_t {
+struct interface_tracker_t
+{
   char eth_name[ETH_ADDR_LEN];
   int isUP;               // true, if UP. false if DOWN.
   struct interface_tracker_t *next;
@@ -82,7 +85,8 @@ struct child_pvid_tuple
 };
 
 /* Local host broadcast ports Table */
-struct local_bcast_tuple {
+struct local_bcast_tuple
+{
   char eth_name[ETH_ADDR_LEN];          // Host port Name
   struct local_bcast_tuple *next;
 };
@@ -129,3 +133,6 @@ int checkForFailures(char **);
 bool checkForFailuresCPVID();
 //bool isInterfaceActive(char *);
 #endif /* FT_PYL_H */
+
+/* Peter Functional Prototypes */
+int sizeOfVIDTable();

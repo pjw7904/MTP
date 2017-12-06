@@ -132,7 +132,9 @@ struct local_bcast_tuple* getInstance_lbcast_LL();
 int checkForFailures(char **);
 bool checkForFailuresCPVID();
 //bool isInterfaceActive(char *);
-#endif /* FT_PYL_H */
 
 /* Peter Functional Prototypes */
 int sizeOfVIDTable();
+int checkForMainVIDTableChanges(char **, char **);
+
+#endif /* FT_PYL_H */

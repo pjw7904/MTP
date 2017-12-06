@@ -94,7 +94,8 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface)
   }
 
   //while (current != NULL)
-	while (current != NULL && current->membership <= 3)
+	//while (current != NULL && current->membership <= 3)
+	while (current != NULL)
 	{
 		//need to add statement to disregard if egress port is 0
 		//9/20/17 - issue was fixed by just adding the continue statement and removing the current = current->next
@@ -103,12 +104,10 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface)
 			continue;
 		}
 
-		printf("VID being looked at: %s", current->vid_addr);
-
     char vid_addr[VID_ADDR_LEN];
 
 		//adding the n won't let the program start with the py script...
-		printf("\n[egressPort value entering while loop: %d\n", egressPort);
+		//printf("\n[egressPort value entering while loop: %d\n", egressPort);
     // <PATH COST> - Taken as '1' for now
     data[payloadLen] = (uint8_t) (current->path_cost + 1);
 
@@ -116,9 +115,6 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface)
     payloadLen = payloadLen + 1;
 
     memset(vid_addr, '\0', VID_ADDR_LEN);
-
-		//finding current eth_name
-		//printf("current eth name: %s\n", current->eth_name);
 
     if (strncmp(interface, current->eth_name, strlen(interface)) == 0)
 		{
@@ -132,7 +128,7 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface)
 			//printf("VID being added to payload (else): %s\n", vid_addr);
     }
 
-		printf("VID being added to payload (final): %s]\n", vid_addr);
+		//printf("VID being added to payload (final): %s]\n", vid_addr);
 
     // <VID_ADDR_LEN>
     data[payloadLen] = strlen(vid_addr);
@@ -147,10 +143,11 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface)
 
     numAdvts++;
 
-		printf("numAdvts = %d\n", numAdvts);
+		printf("numAdvt value: %d\n", numAdvts);
 
     /* VID Advts should not be more than 3, because we need to advertise only the entries that are in Main VID Table
-       from 3 we consider every path as backup path. */
+       from 3 we consider every path as backup path.
+		*/
     if (numAdvts == 3)
 		{
 				printf("hit the break\n");
@@ -175,6 +172,7 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface)
     payloadLen = 0;
   }
 
+	printf("end of build ADVT");
   // Return the total payload Length.
   return payloadLen;
 }
@@ -363,9 +361,10 @@ int add_entry_LL(struct vid_addr_tuple *node)
 			node->membership = 1;
 			main_vid_tbl_head = node;
 
-			char checkVID[30];
-			sprintf(checkVID, "echo %s >> convergenceTime.txt", node->vid_addr);
-			system(checkVID);
+			//is this overflowing the stack? (*** stack smashing detected ***: bin/mtpd terminated)
+			//char checkVID[30];
+			//sprintf(checkVID, "echo %s >> convergenceTime.txt", node->vid_addr);
+			//system(checkVID);
 
 			//tracker++;
 			tracker = 1;
@@ -419,7 +418,6 @@ int add_entry_LL(struct vid_addr_tuple *node)
 				current = current->next;
 			}
 
-			//gobble
 			if(sizeOfVIDTable() > MAX_VID_ENTRIES)
 			{
 				for (current = main_vid_tbl_head; current != NULL; current = current->next)
@@ -538,29 +536,41 @@ int checkForFailures(char **deletedVIDs)
   time_t currentTime = time(0);
   int numberOfFailures = 0;
 
-  while (current != NULL) {
-    if ((current->last_updated !=-1) &&(currentTime - current->last_updated) > (3 * PERIODIC_HELLO_TIME) ) {
+  while (current != NULL)
+	{
+    if ((current->last_updated !=-1) &&(currentTime - current->last_updated) > (3 * PERIODIC_HELLO_TIME) )
+		{
       struct vid_addr_tuple *temp = current;
       deletedVIDs[numberOfFailures] = (char*)calloc(strlen(temp->vid_addr), sizeof(char));
-      if (previous == NULL) {
+
+      if (previous == NULL)
+			{
         main_vid_tbl_head	= current->next;
-      } else {
+      }
+
+			else
+			{
         previous->next = current->next;
       }
+
       strncpy(deletedVIDs[numberOfFailures], temp->vid_addr, strlen(temp->vid_addr));
       current = current->next;
       numberOfFailures++;
       free(temp);
       continue;
     }
+
     previous = current;
     current = current->next;
   }
 
   // if failures are there
-  if (numberOfFailures > 0) {
+  if (numberOfFailures > 0)
+	{
     int membership = 1;
-    for (current = main_vid_tbl_head; current != NULL; current = current->next) {
+
+    for (current = main_vid_tbl_head; current != NULL; current = current->next)
+		{
       current->membership = membership;
       membership++;
     }
@@ -1047,6 +1057,77 @@ int sizeOfVIDTable()
 	{
 		size++;
 	}
-
 	return size;
+}
+/*
+int checkForMainVIDTableChanges(char **VIDs, char **deletedVIDs)
+{
+	struct vid_addr_tuple *current;
+	int numberOfFailures = 0;
+	bool noVIDMatches = true;
+	int i = 0;
+	int k = 0;
+
+	for (current = main_vid_tbl_head; current->membership < 4; current = current->next)
+	{
+		//when there are more than 1 deletion, this needs to be reset..
+		noVIDMatches = true;
+
+		for(i = 0; i < 3; i++)
+		{
+			printf("comparing %s and %s \n", current->vid_addr, VIDs[i]);
+
+			if ((strcmp(VIDs[i], current->vid_addr)) == 0)
+			{
+				noVIDMatches = false;
+				break;
+			}
+		}
+
+		if(noVIDMatches)
+		{
+			deletedVIDs[numberOfFailures] = (char*)calloc(strlen(current->vid_addr), sizeof(char));
+			strncpy(deletedVIDs[numberOfFailures], current->vid_addr, strlen(current->vid_addr));
+
+			printf("New VID (from deletedVIDs): %s\n", deletedVIDs[numberOfFailures]);
+			numberOfFailures++;
+		}
+	}
+	return numberOfFailures;
+}
+*/
+
+int checkForMainVIDTableChanges(char **VIDs, char **deletedVIDs)
+{
+	struct vid_addr_tuple *current;
+	int numberOfFailures = 0;
+	bool noVIDMatches = true;
+	int i = 0;
+
+	for(i = 0; i < 3; i++)
+	{
+		//when there are more than 1 deletion, this needs to be reset..
+		noVIDMatches = true;
+
+		for(current = main_vid_tbl_head; current->membership < 4; current = current->next)
+		{
+			printf("comparing %s and %s \n", VIDs[i], current->vid_addr);
+
+			if ((strcmp(VIDs[i], current->vid_addr)) == 0)
+			{
+				noVIDMatches = false;
+				break;
+			}
+		}
+
+		if(noVIDMatches)
+		{
+			deletedVIDs[numberOfFailures] = (char*)calloc(strlen(VIDs[i]), sizeof(char));
+			strncpy(deletedVIDs[numberOfFailures], VIDs[i], strlen(VIDs[i]));
+
+			printf("New VID (from deletedVIDs): %s\n", deletedVIDs[numberOfFailures]);
+			numberOfFailures++;
+		}
+	}
+	return numberOfFailures;
 }

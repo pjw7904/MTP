@@ -3,8 +3,8 @@
  *
  *
  *  Created on: Sep 21, 2015
- *  Author: Pranav Sai(pk6420@rit.edu)
- *  Peter Willis - MARKED UP FOR MY UNDERSTANDING
+ *  Author: Pranav Sai(pk6420@rit.edu), Peter Willis (pjw7904@rit.edu)
+ *
  * test
  */
 
@@ -152,7 +152,7 @@ int main (int argc, char** argv)
 
 	else
 	{
-		//-----------------------inital join--------------------------
+		//-----------------------initial join--------------------------
 		memset(interfaceNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
 		int numberOfInterfaces = getActiveInterfaces(interfaceNames);
 		uint8_t *payload = NULL;
@@ -183,7 +183,6 @@ int main (int argc, char** argv)
 	free(interfaceNames);
 
 	learn_active_interfaces();
-
 	mtp_start();
 
 	return 0;
@@ -192,7 +191,6 @@ int main (int argc, char** argv)
 /* Start MTP Protocol. */
 void mtp_start()
 {
-
 	int sockCtrl = 0, sockData = 0, recv_len = 0;
 	uint8_t recvBuffer[MAX_BUFFER_SIZE];
 	struct ether_header *eheader = NULL;
@@ -235,7 +233,8 @@ void mtp_start()
 
 		time(&time_advt_fin);
 
-		if(isMain_VID_Table_Empty() && (double)(difftime(time_advt_fin, time_advt_beg) >= PERIODIC_HELLO_TIME))
+		//if(isMain_VID_Table_Empty() && (double)(difftime(time_advt_fin, time_advt_beg) >= PERIODIC_HELLO_TIME))
+		if(isMain_VID_Table_Empty())
 		{
 			memset(interfaceNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
 			int numberOfInterfaces = getActiveInterfaces(interfaceNames);
@@ -498,6 +497,8 @@ void mtp_start()
 					*/
 				case MTP_TYPE_VID_ADVT:
 				{
+						char *mainVIDs[3] = {NULL, NULL, NULL};
+
 						system("echo ADVT MSG RECIEVED: >> MSTC.txt");
 						system("date +%H:%M:%S:%N >> MSTC.txt");
 
@@ -505,21 +506,19 @@ void mtp_start()
 						sprintf(eth, "echo %s >> MSTC.txt", recvOnEtherPort);
 						system(eth);
 
-						//gobble - keep an update on main VID table
 						printf("size of VID table: %d", sizeOfVIDTable());
 
-						if(sizeOfVIDTable() > 3)
+						if(sizeOfVIDTable() >= 3)
 						{
 							struct vid_addr_tuple *currentTable =  getInstance_vid_tbl_LL();
 							int i = 0;
-							char *mainVIDs[3];
 							for(i = 0; i < 3; i++)
 							{
 								mainVIDs[i] = currentTable->vid_addr;
 								currentTable = currentTable->next;
 							}
 
-							printf("current main table: ");
+							printf("\ncurrent main table:\n");
 							for(i = 0; i < 3; i++)
 							{
 								printf("%s\n" ,mainVIDs[i]);
@@ -647,13 +646,6 @@ void mtp_start()
 											// Check PVID used by peer is a derived PVID from me.
 											delete_MACentry_cpvid_LL(&new_node->mac);
 										}
-
-										//gobble - new addition to limit to 6
-										//if(mainVIDTracker == 3)
-										//{
-											//delete_entry_LL(vid_addr);
-											//system("echo [deleted extra VID] >> MSTC.txt");
-										//}
 									}
 								}
 
@@ -661,22 +653,50 @@ void mtp_start()
 								{
 									// Dont do anything, may be a parent vid or duplicate
 									//this is inefficent...
-
-									//system("echo [hit the else] >> MSTC.txt");
 								}
-
 								numberVIDS--;
 							}
 
-							//system("echo [made to after while loop before hasAdditions] >> MSTC.txt");
+							//if(sizeOfVIDTable() > 3 && mainVIDs[2] != NULL), not one tracker is not 1?
+							if(sizeOfVIDTable() > 3 && hasAdditions && mainVIDs[2] != NULL)
+							{
+								memset(deletedVIDs, '\0', sizeof(char) * MAX_VID_LIST * MAX_VID_LIST);
+								int numberToDelete = checkForMainVIDTableChanges(mainVIDs, deletedVIDs);
+								printf("\nnumber to delete: %d\n", numberToDelete);
+
+								if(numberToDelete > 0)
+								{
+									uint8_t *payload = NULL;
+									int payloadLen = 0;
+
+									memset(interfaceNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
+									int numberOfInterfaces = getActiveInterfaces(interfaceNames);
+
+									int i = 0;
+									for(; i < numberOfInterfaces; i++)
+									{
+										payload = (uint8_t*) calloc (1, MAX_BUFFER_SIZE);
+										payloadLen = build_VID_CHANGE_PAYLOAD(payload, interfaceNames[i], deletedVIDs, numberToDelete);
+
+										if(payloadLen)
+										{
+											ctrlSend(interfaceNames[i], payload, payloadLen);
+											system("echo ADVT CHANGE MSG SENT [bc MAIN TABLE CHANGE]: >> MSTC.txt");
+											system("date +%H:%M:%S:%N >> MSTC.txt");
+										}
+										free(payload);
+									}
+								}
+							}
+
 							if(hasAdditions)
 							{
-
 								uint8_t *payload = NULL;
 								int payloadLen = 0;
 								payload = (uint8_t*) calloc (1, MAX_BUFFER_SIZE);
 								// recvOnEtherPort - Payload destination will same from where ADVT message has orginated.
 								payloadLen = build_VID_ADVT_PAYLOAD(payload, recvOnEtherPort);
+
 								if (payloadLen)
 								{
 									ctrlSend(recvOnEtherPort, payload, payloadLen);
@@ -719,12 +739,10 @@ void mtp_start()
 								free(payload);
 							// ----------------------------------REST OF INTERFACES END------------------------------
 							}
-							//system("echo [made to the end of VID add] >> MSTC.txt");
 						}
 
 						else if (operation == VID_DEL)
 						{
-							//printf ("GOT VID_DEL\n");
 							// Message ordering <MSG_TYPE> <OPERATION> <NUMBER_VIDS> <VID_ADDR_LEN> <MAIN_TABLE_VID + EGRESS PORT>
 							uint8_t numberVIDS = (uint8_t) recvBuffer[16];
 
@@ -773,7 +791,6 @@ void mtp_start()
 										system("echo ADVT CHANGE MSG SENT [bc DEL received]: >> MSTC.txt");
 										system("date +%H:%M:%S:%N >> MSTC.txt");
 									}
-
 									free(payload);
 								}
 
@@ -797,7 +814,6 @@ void mtp_start()
 									free(payload);
 								}
 							}
-							//system("echo [made to the end of VID del] >> MSTC.txt");
 						}
 
 						else

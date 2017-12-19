@@ -93,7 +93,6 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface)
     }
   }
 
-  //while (current != NULL)
 	//while (current != NULL && current->membership <= 3)
 	while (current != NULL)
 	{
@@ -190,7 +189,8 @@ int  build_VID_ADVT_PAYLOAD(uint8_t *data, char *interface)
  */
 
 // Message ordering <MSG_TYPE>
-int  build_JOIN_MSG_PAYLOAD(uint8_t *data) {
+int build_JOIN_MSG_PAYLOAD(uint8_t *data)
+{
   int payloadLen = 0;
 
   // <MSG_TYPE> - Hello Join Message, Type - 1.
@@ -540,6 +540,13 @@ int checkForFailures(char **deletedVIDs)
 	{
     if ((current->last_updated !=-1) &&(currentTime - current->last_updated) > (3 * PERIODIC_HELLO_TIME) )
 		{
+			//system("echo A link failure was recorded on: >> linkFail.txt");
+			//system("date +%H:%M:%S:%N >> linkFail.txt");
+
+			//char eth[25];
+			//sprintf(eth, "echo %s >> linkFail.txt", current->eth_name);
+			//system(eth);
+
       struct vid_addr_tuple *temp = current;
       deletedVIDs[numberOfFailures] = (char*)calloc(strlen(temp->vid_addr), sizeof(char));
 

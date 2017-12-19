@@ -7,7 +7,6 @@
  *
  * test
  */
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <netdb.h>
@@ -48,7 +47,7 @@ bool checkInterfaceIsActive(char *);
 
 //Global variables
 bool isRoot = false;
-struct interface_tracker_t *interfaceTracker = NULL;
+struct interface_tracker_t *interface_head = NULL;
 
 //main function, protocol begins here
 int main (int argc, char** argv)
@@ -96,7 +95,6 @@ int main (int argc, char** argv)
 		add_entry_lbcast_LL(new_node);
 	}
 //----------------------------------------------------------BCAST TABLE END-----------------------------------------------------------------------------
-
 
 	// If Node is Root MTS
 	if (isRoot)
@@ -180,6 +178,8 @@ int main (int argc, char** argv)
 		free(payload);
 		//-----------------------inital join--------------------------
 	}
+
+
 	free(interfaceNames);
 
 	learn_active_interfaces();
@@ -228,13 +228,95 @@ void mtp_start()
 	system("echo START TIME: >> MSTC.txt");
 	system("date +%H:%M:%S:%N >> MSTC.txt");
 
+
 	while (true)
 	{
 
 		time(&time_advt_fin);
 
-		//if(isMain_VID_Table_Empty() && (double)(difftime(time_advt_fin, time_advt_beg) >= PERIODIC_HELLO_TIME))
-		if(isMain_VID_Table_Empty())
+		//start of new link failure code
+		struct interface_tracker_t *currentInterface = interface_head;
+		while(currentInterface != NULL)
+		{
+			if(checkInterfaceIsActive(currentInterface->eth_name) != true)
+			{
+
+				/*just for recording purposes*/
+				if(currentInterface->isUP == true)
+				{
+					system("echo A link failure was found on: >> linkFail.txt");
+					system("date +%H:%M:%S:%N >> linkFail.txt");
+
+					char ethFail[25];
+					sprintf(ethFail, "echo %s >> linkFail.txt", currentInterface->eth_name);
+					system(ethFail);
+				}
+				/*end of recording*/
+
+				currentInterface->isUP = false;
+			}
+
+			else
+			{
+				currentInterface->isUP = true;
+			}
+
+			if(currentInterface->isUP == false)
+			{
+				struct vid_addr_tuple *currentVID =  getInstance_vid_tbl_LL();
+				while(currentVID != NULL)
+				{
+					if(strcmp(currentVID->eth_name, currentInterface->eth_name) == 0)
+					{
+						currentVID->last_updated -= 100000;
+					}
+					currentVID = currentVID->next;
+				}
+			}
+			currentInterface = currentInterface->next;
+		}
+
+		memset(deletedVIDs, '\0', sizeof(char) * MAX_VID_LIST * MAX_VID_LIST);
+		int numberOfDeletions = checkForFailures(deletedVIDs);
+
+		if(numberOfDeletions > 0)
+		{
+			uint8_t *payload = NULL;
+			int payloadLen = 0;
+
+			memset(interfaceNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
+			int numberOfInterfaces = getActiveInterfaces(interfaceNames);
+
+			system("[Sending ADVT DEL because its a bad VID] >> linkFail.txt");
+
+			int i = 0;
+			for (; i < numberOfInterfaces; i++)
+			{
+				payload = (uint8_t*) calloc (1, MAX_BUFFER_SIZE);
+				payloadLen = build_VID_CHANGE_PAYLOAD(payload, interfaceNames[i], deletedVIDs, numberOfDeletions);
+
+				if (payloadLen)
+				{
+					ctrlSend(interfaceNames[i], payload, payloadLen);
+
+					system("echo VID CHANGE MSG SENT [bc VID failure]: >> MSTC.txt");
+					system("date +%H:%M:%S:%N >> MSTC.txt");
+				}
+				free(payload);
+			}
+
+			printf("This VID was removed due to a link failure");
+
+			print_entries_LL();                     // MAIN VID TABLE
+			print_entries_bkp_LL();                 // BKP VID TABLE
+			print_entries_cpvid_LL();               // CHILD PVID TABLE
+			print_entries_lbcast_LL();              // LOCAL HOST PORTS
+		}
+
+
+
+		//if(isMain_VID_Table_Empty())
+		if(isMain_VID_Table_Empty() && (double)(difftime(time_advt_fin, time_advt_beg) >= PERIODIC_HELLO_TIME))
 		{
 			memset(interfaceNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
 			int numberOfInterfaces = getActiveInterfaces(interfaceNames);
@@ -269,6 +351,7 @@ void mtp_start()
 		{
 			memset(interfaceNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
 			int numberOfInterfaces = getActiveInterfaces(interfaceNames);
+
 			uint8_t *payload = NULL;
 			int payloadLen = 0;
 
@@ -289,9 +372,9 @@ void mtp_start()
 						char eth[20];
 						sprintf(eth, "echo %s >> MSTC.txt", interfaceNames[i]);
 						system(eth);
-
 					}
 				}
+
 				free(payload);
 			}
 
@@ -301,9 +384,8 @@ void mtp_start()
 			int numberOfDeletions = checkForFailures(deletedVIDs);
 			bool hasCPVIDDeletions = checkForFailuresCPVID();
 
-			if ( numberOfDeletions != 0)
+			if(numberOfDeletions != 0)
 			{
-
 				int i = 0;
 				for (; i < numberOfInterfaces; i++)
 				{
@@ -565,7 +647,8 @@ void mtp_start()
 								vid_addr[vid_len] = '\0';
 
 								printf("VID Address: %s]\n", vid_addr);
-								char checkVID[30];
+
+								char checkVID[40];
 								sprintf(checkVID, "echo %s >> MSTC.txt", vid_addr);
 							  system(checkVID);
 
@@ -651,8 +734,7 @@ void mtp_start()
 
 								else
 								{
-									// Dont do anything, may be a parent vid or duplicate
-									//this is inefficent...
+									system("echo [not sure what to do with VID] >> MSTC.txt");
 								}
 								numberVIDS--;
 							}
@@ -912,7 +994,8 @@ void mtp_start()
 }
 
 // get active interfaces on the node.
-int getActiveInterfaces(char **ptr ) {
+int getActiveInterfaces(char **ptr )
+{
 	// find all interfaces on the node.
 	int indexLen = 0;
 
@@ -920,18 +1003,21 @@ int getActiveInterfaces(char **ptr ) {
 	struct ifaddrs *ifaddr, *ifa;
 
 	/*The getifaddrs() function creates a linked list of structures describing the network interfaces of the local system,
-	 *and stores the address of the first item of the list in *ifap.  The list consists of ifaddrs structures
+	 *and stores the address of the first item of the list in *ifa.  The list consists of ifaddrs structures
 	 */
-	if (getifaddrs(&ifaddr) ) {
+	if (getifaddrs(&ifaddr) )
+	{
 		perror("Error: getifaddrs Failed\n");
 		exit(0);
 	}
 
 	// loop through the list, the last part moves the list to the next struct (interface) as long as there still is one (!NULL)
-	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+	{
 
 		//if the interfaces has no address, continue
-		if (ifa->ifa_addr == NULL) {
+		if (ifa->ifa_addr == NULL)
+		{
 			continue;
 		}
 
@@ -940,7 +1026,8 @@ int getActiveInterfaces(char **ptr ) {
 		family = ifa->ifa_addr->sa_family;
 
 		// populate interface names, if interface is in the AF_INET family, UP, and if ethernet interface doesn't belong to control interface and Loopback interface.
-		if (family == AF_INET && (strncmp(ifa->ifa_name, "lo", 2) != 0) && (ifa->ifa_flags & IFF_UP) != 0) {
+		if (family == AF_INET && (strncmp(ifa->ifa_name, "lo", 2) != 0) && (ifa->ifa_flags & IFF_UP) != 0)
+		{
 			char networkIP[NI_MAXHOST];
 
 			//IPv4 AF_INET sockets, grab the IP address from the general ifaddrs struct
@@ -953,7 +1040,8 @@ int getActiveInterfaces(char **ptr ) {
 			//printf("IP address being checked for getActiveInt: %s\n", networkIP);
 
 			//compares first three bytes to determine if its control interface from GENI (172.16.0.0/12)
-			if (strncmp(networkIP, CTRL_IP, 3) == 0) {
+			if (strncmp(networkIP, CTRL_IP, 3) == 0)
+			{
 				// skip, as it is control interface.
 				//printf("we are skipping over the control addr %s\n", networkIP);
 				continue;
@@ -971,9 +1059,11 @@ int getActiveInterfaces(char **ptr ) {
 }
 
 
-void learn_active_interfaces() {
+void learn_active_interfaces()
+{
 	int numberOfInterfaces;
 	char **iNames;
+	struct interface_tracker_t *current = NULL;
 
 	iNames = (char**) calloc (MAX_INTERFACES*MAX_INTERFACES, sizeof(char));
 	memset(iNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
@@ -981,37 +1071,50 @@ void learn_active_interfaces() {
 	numberOfInterfaces = getActiveInterfaces(iNames);
 
 	int i = 0;
-	for (; i < numberOfInterfaces; i++) {
+	for (; i < numberOfInterfaces; i++)
+	{
 		struct interface_tracker_t *temp = (struct interface_tracker_t*) calloc (1, sizeof(struct interface_tracker_t));
 		strncpy (temp->eth_name, iNames[i], strlen(iNames[i]));
 		temp->isUP = true;
-		temp->next = interfaceTracker;
-		interfaceTracker = temp;
+		temp->next = current;
+		current = temp;
 	}
+
+	interface_head = current; //the key to all of this, remember this for linked lists!
+
+	printf("testing testing 123\n");
 }
 
-bool checkInterfaceIsActive(char *str) {
+
+bool checkInterfaceIsActive(char *str)
+{
 	// find all interfaces on the node.
 	struct ifaddrs *ifaddr, *ifa;
 
-	if (getifaddrs(&ifaddr) ) {
+	if (getifaddrs(&ifaddr))
+	{
 		perror("Error: getifaddrs Failed\n");
 		exit(0);
 	}
 
 	// loop through the list
-	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-		if (ifa->ifa_addr == NULL) {
+	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+	{
+		if (ifa->ifa_addr == NULL)
+		{
 			continue;
 		}
+
 		int family;
 		family = ifa->ifa_addr->sa_family;
 
-		if (family == AF_INET && (strncmp(ifa->ifa_name, str, strlen(str)) == 0) && (ifa->ifa_flags & IFF_UP) != 0) {
+		if (family == AF_INET && (strncmp(ifa->ifa_name, str, strlen(str)) == 0) && (ifa->ifa_flags & IFF_UP) != 0)
+		{
 			freeifaddrs(ifaddr);
 			return true;
 		}
 	}
 	freeifaddrs(ifaddr);
+
 	return false;
 }

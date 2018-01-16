@@ -278,6 +278,7 @@ void mtp_start()
 
 		memset(deletedVIDs, '\0', sizeof(char) * MAX_VID_LIST * MAX_VID_LIST);
 		int numberOfDeletions = checkForFailures(deletedVIDs);
+		bool hasCPVIDDeletions = checkForFailuresCPVID();
 
 		if(numberOfDeletions > 0)
 		{
@@ -287,7 +288,7 @@ void mtp_start()
 			memset(interfaceNames, '\0', sizeof(char) * MAX_INTERFACES * MAX_INTERFACES);
 			int numberOfInterfaces = getActiveInterfaces(interfaceNames);
 
-			system("[Sending ADVT DEL because its a bad VID] >> linkFail.txt");
+			system("echo [Sending ADVT DEL because its a bad VID] >> linkFail.txt");
 
 			int i = 0;
 			for (; i < numberOfInterfaces; i++)
@@ -305,6 +306,33 @@ void mtp_start()
 				free(payload);
 			}
 
+			// Also check CPVID Table.
+			i = 0;
+			for (; i < numberOfDeletions; i++)
+			{
+				delete_entry_cpvid_LL(deletedVIDs[i]); //NS has exceeded expiry time and have not received hello
+			}
+
+			struct vid_addr_tuple* c1 =  getInstance_vid_tbl_LL();
+			if (c1 != NULL)
+			{
+				payload = (uint8_t*) calloc (1, MAX_BUFFER_SIZE);
+				print_entries_LL();
+				payloadLen = build_VID_ADVT_PAYLOAD(payload, c1->eth_name);
+				// NS announcing my parent that I have a PVID from him
+				if (payloadLen)
+				{
+					ctrlSend(c1->eth_name, payload, payloadLen);
+
+					system("echo ADVT MSG SENT [bc deletions]: >> MSTC.txt");
+					system("date +%H:%M:%S:%N >> MSTC.txt");
+					char eth[20];
+					sprintf(eth, "echo %s >> MSTC.txt", c1->eth_name);
+					system(eth);
+				}
+				free(payload);
+			}
+
 			printf("This VID was removed due to a link failure");
 
 			print_entries_LL();                     // MAIN VID TABLE
@@ -312,7 +340,6 @@ void mtp_start()
 			print_entries_cpvid_LL();               // CHILD PVID TABLE
 			print_entries_lbcast_LL();              // LOCAL HOST PORTS
 		}
-
 
 
 		//if(isMain_VID_Table_Empty())
@@ -378,11 +405,14 @@ void mtp_start()
 				free(payload);
 			}
 
+			time(&time_advt_beg);
+
+			/* - placed where the link failure code is
 			memset(deletedVIDs, '\0', sizeof(char) * MAX_VID_LIST * MAX_VID_LIST);
 
 			// check for failures and delete if any VID exceeds periodic hello by (PERIODIC_HELLO_TIME * 3)
-			int numberOfDeletions = checkForFailures(deletedVIDs);
-			bool hasCPVIDDeletions = checkForFailuresCPVID();
+			int numberOfDeletions = checkForFailures(deletedVIDs); //NS go thrugh VIDs abd see if any have exceeded the expiry time
+			bool hasCPVIDDeletions = checkForFailuresCPVID(); // boolen as I have only one CPVID- NS - Check ??
 
 			if(numberOfDeletions != 0)
 			{
@@ -407,7 +437,7 @@ void mtp_start()
 				i = 0;
 				for (; i < numberOfDeletions; i++)
 				{
-					delete_entry_cpvid_LL(deletedVIDs[i]);
+					delete_entry_cpvid_LL(deletedVIDs[i]); //NS has exceeded expiry time and have not received hello
 				}
 
 
@@ -418,7 +448,7 @@ void mtp_start()
 					payload = (uint8_t*) calloc (1, MAX_BUFFER_SIZE);
 					print_entries_LL();
 					payloadLen = build_VID_ADVT_PAYLOAD(payload, c1->eth_name);
-
+					// NS announcing my parent that I have a PVID from him
 					if (payloadLen)
 					{
 						ctrlSend(c1->eth_name, payload, payloadLen);
@@ -443,8 +473,8 @@ void mtp_start()
 				print_entries_lbcast_LL();              // LOCAL HOST PORTS
 
 			}
+			*/
 			// resets the periodic hello time
-			time(&time_advt_beg);
 		}
 
 		//start the process of receiving MT_PDU's
@@ -687,6 +717,7 @@ void mtp_start()
 											printf("this is being deleted? CPVID: %s\n", vid_addr);
 											system("echo [Already in CPVID table] >> MSTC.txt");
 											free(new_cpvid);
+											//update CPVID time here
 										}
 									}
 								}

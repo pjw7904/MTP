@@ -540,12 +540,11 @@ int checkForFailures(char **deletedVIDs)
 	{
     if ((current->last_updated !=-1) &&(currentTime - current->last_updated) > (3 * PERIODIC_HELLO_TIME) )
 		{
-			//system("echo A link failure was recorded on: >> linkFail.txt");
-			//system("date +%H:%M:%S:%N >> linkFail.txt");
-
-			//char eth[25];
-			//sprintf(eth, "echo %s >> linkFail.txt", current->eth_name);
-			//system(eth);
+			system("echo A VID was taken down: >> linkFail.txt");
+			system("date +%H:%M:%S:%N >> linkFail.txt");
+			char eth[25];
+			sprintf(eth, "echo %s >> linkFail.txt", current->eth_name);
+			system(eth);
 
       struct vid_addr_tuple *temp = current;
       deletedVIDs[numberOfFailures] = (char*)calloc(strlen(temp->vid_addr), sizeof(char));
@@ -607,6 +606,13 @@ bool delete_entry_LL(char *vid_to_delete)
 	  tracker += 1;
 	  if (strncmp(vid_to_delete, current->vid_addr, strlen(vid_to_delete)) == 0)
 		{
+
+			system("echo A VID was taken down: >> linkFail.txt");
+			system("date +%H:%M:%S:%N >> linkFail.txt");
+			char vidToDelete[40];
+			sprintf(vidToDelete, "echo %s >> linkFail.txt", current->vid_addr);
+			system(vidToDelete);
+
 		  struct vid_addr_tuple *temp = current;
 
 		  if (previous == NULL)
